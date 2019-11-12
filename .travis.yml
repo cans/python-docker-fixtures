@@ -1,0 +1,15 @@
+---
+dist: bionic
+install:
+  - pip install -e .[dev]
+language: python
+python:
+  - "3.6"
+  - "3.7"
+  - "3.8"
+script:
+  pytest --cov-report=xml
+services:
+  - docker
+
+# vim: et:sw=2:syntax=2:ts=2:

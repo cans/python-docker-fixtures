@@ -1,0 +1,111 @@
+---
+version: 2.1
+
+orbs:
+  codecov: codecov/codecov@1.0.2
+
+jobs:
+  test:
+    description: Run the test suite
+    machine:
+      image: circleci/classic:201808-01
+    parameters:
+      pyversion:
+        type: string
+        default: "3.7"
+
+    steps:
+      - checkout
+      - restore_cache:
+          key: venv-{{ checksum "setup.cfg" }}-v1
+      - run:
+          name: setup environment
+          command: |
+            if [ -d ~/.venv ]
+            then
+                echo "Virtual environment restored from cache"
+            else
+                eval "$(pyenv init -)"
+                pyenv shell $(pyenv versions | sed -nEe 's/^([^0-9]+)('"`echo "<< parameters.pyversion >>" | sed -e 's/\./\./'`"'\.[0-9]+)(.*)/\2/p')
+                python -m venv ~/.venv
+                . ~/.venv/bin/activate
+                pip install -U -e .[dev]
+            fi
+
+      - save_cache:
+          key: venv-{{ checksum "setup.cfg" }}-<< parameters.pyversion >>-v1
+          paths:
+            - ~/.venv
+
+      - run:
+          name: Run tests
+          command: |
+            . ~/.venv/bin/activate
+            pytest --cov-report=xml --junitxml=test-reports/junit.xml
+
+      - store_test_results:
+          path: test-reports
+
+      - codecov/upload:
+          file: coverage.xml
+
+    working_directory: ~/docker-fixtures
+
+
+  package:
+    docker:
+      - image: python:3.7-slim
+    steps:
+      - checkout
+      - run:
+          name: "Build and Upload Package"
+          command: |
+            python setup.py sdist bdist_wheel
+            cat > ~/.pypirc \<<HERE
+            [distutils]
+            index-servers =
+              pypi
+
+            [pypi]
+            repository=https://test.pypi.org/legacy/
+            username = ${CANS_PYPI_CIRCLECI_USERNAME}
+            password = ${CANS_PYPI_CIRCLECI_PASSWORD}
+            HERE
+            twine upload -r pypi dist/*.whl
+            rm ~/.pypirc
+    working_directory: ~/docker-fixtures
+
+
+workflows:
+  version: 2
+  test-and-package:
+    jobs:
+    - test:
+        name: "test3.6"
+        pyversion: "3.6"
+
+    - test:
+        name: "test3.7"
+        pyversion: "3.7"
+
+    # Not available yet
+    # - test:
+    #     name: "test3.8"
+    #     pyversion: "3.8"
+
+    - package:
+        requires:
+          - test3.6
+          - test3.7
+          # - test3.8
+        filters:
+          branches:
+            ignore:
+              - /.*/
+          tags:
+            only:
+              - /v[0-9]+\.[0-9]+\.[0-9]+/
+        context: py-package
+
+
+# vim: et:sw=2:syntax=2:ts=2:

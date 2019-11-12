@@ -1,0 +1,12 @@
+- v0.1: provide basic container fixture, with basic environment
+  variables overrides;
+- v0.2: support mounting volumes on the container. Technically
+  already doable via options, but can we do better;
+- v0.3: [idea] see how we can provide tools to build
+  Image instances by instrospection of images and registries;
+- v0.4: [idea] How to have the fixture discover images within
+  the project it is used ? (walk project tree to find Dockerfile,
+  docker-compose.yml ?);
+- _Add ideas here_ ;
+
+- v1.0: 90% test coverage, pushed to pypi.
