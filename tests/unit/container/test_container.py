@@ -1,10 +1,8 @@
 # -*- coding: utf-8; -*-
-from unittest import mock
-
 import pytest
 
 from dockerfixtures.image import Image
-from dockerfixtures.container import Container, _CONTAINER_DEFAULT_OPTIONS
+from dockerfixtures.container import _CONTAINER_DEFAULT_OPTIONS, Container
 
 
 def test_container_image_attribute_is_set():
@@ -19,16 +17,17 @@ def test_container_image_attribute_is_set():
 
 
 def test_container_environment_inherits_image_environment(dummy_env, client, running_container):
-    # given
+    # Given
     image = Image('', environment=dummy_env)
-    cntr = Container(image, poll_interval=0)
+    cntr = Container(image, startup_poll_interval=0.0)
 
     # When
     cntr.run(dockerclient=client)
 
     # Then
-    client.containers.run.assert_called_once_with(image=image.pullname,
+    client.containers.run.assert_called_once_with(command=None,
                                                   environment=dummy_env,
+                                                  image=client.images.get(image.pullname),
                                                   **cntr.options)
 
 
@@ -54,80 +53,32 @@ def test_container_never_run_has_no_id():
     assert cntr.id is None
 
 
-def test_container_run_raises_runtime_error_when_exited(client,
-                                                        container_exited_after_reload):
-    """
-    """
-    # Given
-    image = Image('')
-    cntr = Container(image)
-
-    # When
-    with pytest.raises(RuntimeError):
-        cntr.run(dockerclient=client)
-
-    # Then
-    container_exited_after_reload.reload.assert_called_once_with()
-
-
-def test_container_running(client, container_running_after_reload):
-    """
-    """
-    # Given
-    image = Image('')
-    cntr = Container(image)
-
-    # When
-    result = cntr.run(dockerclient=client)
-
-    # Then
-    assert result == container_running_after_reload.id
-    container_running_after_reload.reload.assert_called_once_with()
-
-
-def test_container_running_after_second_reload(client, container_running_after_2_reload):
-    """
-    """
-    # Given
-    poll_interval = 10
-    image = Image('')
-    cntr = Container(image, poll_interval=poll_interval)
-
-    # When
-    with mock.patch('dockerfixtures.container.time') as time:
-        result = cntr.run(dockerclient=client)
-
-    # Then
-    assert container_running_after_2_reload.id == result
-    assert container_running_after_2_reload.reload.call_count == 2
-    time.sleep.assert_called_once_with(poll_interval)
-
-
+@pytest.mark.filterwarnings('ignore:dockerfixtures.container::RuntimeWarning')
 def test_container_as_a_context_manager(client, running_container):
     # Given
     image = Image('')
-    cntr = Container(image, dockerclient=client, max_wait=0)
 
     # When
-    with cntr:
+    with Container(image, dockerclient=client, max_wait=0):
         pass
 
     assert client.containers.run.called
     assert running_container.kill.called
 
 
+@pytest.mark.filterwarnings('ignore:dockerfixtures.container::RuntimeWarning')
 def test_container_as_a_context_manager_raises_if_no_client():
     # Given
     image = Image('')
-    cntr = Container(image)
 
     # Ensure
     with pytest.raises(ValueError):
         # When
-        with cntr:
+        with Container(image):
             pass
 
 
+@pytest.mark.filterwarnings('ignore:dockerfixtures.container::RuntimeWarning')
 def test_container_as_a_context_manager_reraises_exception(client, running_container):
     # Given
     image = Image('')

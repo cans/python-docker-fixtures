@@ -1,10 +1,13 @@
 # -*- coding: utf-8; -*-
 import logging
+import socket
 import subprocess
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+import warnings
 
 import docker
+import requests.exceptions
 
 from .image import Image
 
@@ -22,30 +25,67 @@ CONTAINER_STATUS_PAUSED = 'paused'
 CONTAINER_STATUS_RUNNING = 'running'
 # Couldn't find those in the docker module... need to look harder
 
-_OK_CONTAINER_STATUSES = (CONTAINER_STATUS_RUNNING,
-                          )
-_KO_CONTAINER_STATUSES = (CONTAINER_STATUS_DEAD,
+_CONTAINER_STATUSES_KO = (CONTAINER_STATUS_DEAD,
                           CONTAINER_STATUS_EXITED,
                           )
-_WAIT_CONTAINER_STATUSES = (CONTAINER_STATUS_CREATED,
+_CONTAINER_STATUSES_OK = (CONTAINER_STATUS_RUNNING,
+                          )
+_CONTAINER_STATUSES_WAIT = (CONTAINER_STATUS_CREATED,
                             CONTAINER_STATUS_PAUSED,
                             )
+_SUPPORTED_NETWORK_PROTOCOLS = ['tcp', 'udp']
+
+MANIFEST_V2 = 'application/vnd.docker.distribution.manifest.v2+json'
+MANIFEST_LIST_V2 = 'application/vnd.docker.distribution.manifest.list.v2+json'
+SUPPORTED_MANIFEST_TYPES = (MANIFEST_V2, MANIFEST_LIST_V2)
 
 
 class TimeOut(Exception):
-    pass
+    """Raised when a container does not start within the alloted time
+    """
+
+
+class ImageNotFound(Exception):
+    """Raised when an image cannot be found in the docker registry
+    """
+
+
+class UnsupportedNetworkProtocol(Exception):
+    """Raised when a port value contains an invalid protocol name
+    """
+
+
+def _port(port: str) -> Tuple[int, str]:
+    """Transforms ports in the '<port>/<proto>' syntax into a tuple.
+    """
+    if '/' in port:
+        port, proto = port.split('/')
+    else:
+        port, proto = port, None
+
+    if not proto:
+        return int(port), 'tcp'
+    if proto not in _SUPPORTED_NETWORK_PROTOCOLS:
+        raise UnsupportedNetworkProtocol("Protocol '{}' is not supported, only {} are."
+                                         .format(proto,
+                                                 ' and '.join([
+                                                     ', '.join(_SUPPORTED_NETWORK_PROTOCOLS[:-1]),
+                                                     *_SUPPORTED_NETWORK_PROTOCOLS[:-1]])))
+    return int(port), proto
 
 
 class Container:
     """Represents a container
     """
     __slots__ = ('__client',
+                 '__command',
                  '__container',
                  '__environment',
                  '__image',
                  '__max_wait',
                  '__options',
-                 '__poll_interval',
+                 '__readyness_poll_interval',
+                 '__startup_poll_interval',
                  )
 
     def __enter__(self):
@@ -53,32 +93,36 @@ class Container:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        self.__container.kill()
-        self.__container.remove()
+        self.kill()
+        self.remove()
         if exc_value:
             raise exc_value
 
     def __init__(self,
                  image: Image,
                  *,
+                 command: Optional[Union[str, List[str]]] = None,
                  dockerclient: docker.client.DockerClient = None,
                  environment: Dict[str, str] = None,
                  max_wait: int = 10,
                  options=None,
-                 poll_interval: int = 1,
+                 startup_poll_interval: float = 1,
+                 readyness_poll_interval: float = 0.2,
                  ):
         """
 
-        TODO: Build container from an ID ?
+        TODO: Build container from an ID ? (restart paused container)
         """
         assert max_wait >= 0
         self.__client = dockerclient
+        self.__command = None
         self.__container = None
         self.__environment = _prune_dict({** image.default_environment, **(environment or dict())})
         self.__image = image
         self.__max_wait = max_wait
         self.__options = options or dict()
-        self.__poll_interval = poll_interval
+        self.__readyness_poll_interval = readyness_poll_interval
+        self.__startup_poll_interval = startup_poll_interval
 
     def check(self):
         """Runs the check command provided by the image.
@@ -92,7 +136,7 @@ class Container:
         subprocess.check_call(command, shell=False)
 
     @property
-    def address(self):
+    def address(self) -> str:
         """Returns the container's IP address
         """
         try:
@@ -122,7 +166,16 @@ class Container:
         return self.__image
 
     def kill(self):
-        self.__container.kill()
+        """Kills the container if still running.
+
+        Equivalent to the `docker stop <ContainerID>` command
+        """
+        try:
+            self.__container.kill()
+        except requests.exceptions.HTTPError as exc:
+            if exc.response.status_code != 409:
+                raise
+            # Container was already dead.
 
     @property
     def options(self) -> Dict[str, Any]:
@@ -143,12 +196,44 @@ class Container:
         options = {**_CONTAINER_DEFAULT_OPTIONS, **self.__options}
         return options
 
-    def remove(self) -> None:
-        if self.__container is not None:
-            self.__container.remove(v=True, force=True)
+    @property
+    def ports(self) -> Dict[str, Tuple[int, str]]:
+        """Try to return the set of ports the container listens on.
 
-    def run(self, dockerclient=None):
+        Return value is::
+
+            {'<port>/proto': (<effective port>, 'proto'), }
+
+        """
+        if self.__container is not None:
+            image = self.__container.image
+        else:
+            image_meta = self.__client.images.get_registry_data(name=self.__image.pullname)
+            assert image_meta.attrs['Descriptor']['mediaType'] in SUPPORTED_MANIFEST_TYPES
+            image = image_meta.pull()
+        # Get list of exposed ports
+        ports = {k: _port(k) for k, v in image.attrs.get('ExposedPorts', {}).items()}
+        # Update with the possible port mapping(s)
+        ports.update({k: _port(k) for k, v in self.__options.get('ports', {}).items()})
+        return ports
+
+    def remove(self) -> None:
+        """Removes the container
+
+        Equivalent to the `docker rm <ContainerID>` command
+        """
+        if self.__container is None:
+            warnings.warn('Container was never started!', RuntimeWarning)
+            return
+        self.__container.remove(v=True, force=True)
+
+    def run(self, command=None, dockerclient=None):
         """Starts the container
+
+        Args:
+            dockerclient: a docker client if none were provided on container instanciation
+            command: alternate command for the container to run, instead its default CMD or
+                ENTRYPOINT
 
         Raises:
             docker.errors.ImageNotFound: if the image to use to build the container cannot be found.
@@ -164,39 +249,76 @@ class Container:
         try:
             image = self.__client.images.get(self.__image.pullname)
         except docker.errors.ImageNotFound as exc:
-            raise ImageNotFound("Image '%s' does not exist", self.__image.pullname) from exc
+            raise ImageNotFound("Image '{}' does not exist".format(self.__image.pullname)) from exc
 
         logging.getLogger(__name__).debug('Starting container from image: %s', self.__image.name,
                                           extra={'pullname': self.__image.pullname,
                                                  'environment': self.__environment,
                                                  'options': self.options,
                                                  })
-        self.__container = self.__client.containers.run(image=image,
+        self.__container = self.__client.containers.run(command=command or self.__command,
+                                                        image=image,
                                                         environment=self.__environment,
                                                         **self.options,
                                                         )
         for _ in range(self.__max_wait):
-            # Ain't there a synchronous API ?
             self.__container.reload()
             logging.getLogger(__name__).debug('Container %s status is %s',
                                               self.__container.id,
                                               self.__container.status)
-            if self.__container.status in _OK_CONTAINER_STATUSES:
+            if self.__container.status in _CONTAINER_STATUSES_OK:  # pylint: disable=no-else-break
                 break
-            if self.__container.status in _KO_CONTAINER_STATUSES:
-                raise RuntimeError('Container exited permaturelly')
-            if self.__container.status in _WAIT_CONTAINER_STATUSES:
-                time.sleep(self.__poll_interval)  # pylint: disable=expression-not-assigned
+            elif self.__container.status in _CONTAINER_STATUSES_KO:
+                raise RuntimeError('Container stopped prematurely')
+            elif self.__container.status in _CONTAINER_STATUSES_WAIT:
+                time.sleep(self.__startup_poll_interval)  # pylint: disable=expression-not-assigned
+            else:
+                warnings.warn('Unknown container status!', RuntimeWarning)
 
         else:
             self.__container.reload()
-            if self.__container.status not in _OK_CONTAINER_STATUSES:
-                raise TimeOut('Container {} is taking too long to start'.format(self.__container.id))
+            if self.__container.status not in _CONTAINER_STATUSES_OK:
+                raise TimeOut('Container {} is taking too long to start'
+                              .format(self.__container.id))
 
         return self.__container.id
 
+    def wait(self,
+             *ports: Tuple[Tuple[int, str], ...],
+             max_wait: float = None,
+             readyness_poll_interval: float = 0.1,
+             ) -> None:
+        """Waits for the container to be listening on some network ports.
+        """
+        if not ports:
+            next_round_ports = list(self.ports.values())
+        else:
+            next_round_ports = list(ports)
+        max_wait = max_wait or self.__image.max_wait
 
-def _prune_dict(dictionary):
+        then = time.time()
+        while (time.time() - then) < max_wait:
+            ports = next_round_ports
+            next_round_ports = []
+
+            for port, proto in ports:
+                try:
+                    sock_proto = socket.SOCK_STREAM if proto == 'tcp' else socket.SOCK_DGRAM
+                    with socket.socket(socket.AF_INET, sock_proto) as sock:
+                        sock.connect((self.address, port))
+                except ConnectionError:
+                    next_round_ports.append((port, proto))
+                    time.sleep(readyness_poll_interval)
+
+            if not next_round_ports:
+                return True
+        raise TimeOut('Container taking too long to become ready (waited {:.2f}s.): {}'
+                      .format(time.time() - then,
+                              ', '.join(['{}/{}'.format(str(x[0]), x[1])
+                                         for x in next_round_ports])))
+
+
+def _prune_dict(dictionary: Mapping[Any, Optional[Any]]) -> Mapping[Any, Any]:
     """Removes None values from possibly nested dict.
 
     Note: this function does not prune structures others than dict,
@@ -208,8 +330,10 @@ def _prune_dict(dictionary):
     for key, value in dictionary.items():
         if value is None:
             continue
-        elif isinstance(value, dict):
-            res[key] = _prune_dict(value)
+        if isinstance(value, dict):
+            value = _prune_dict(value)
+            if len(value) > 0:
+                res[key] = value
         else:
             res[key] = value
     return res
