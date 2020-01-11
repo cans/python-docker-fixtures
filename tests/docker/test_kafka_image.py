@@ -2,9 +2,8 @@
 import functools
 import json
 import logging
-import time
 
-from kafka import errors, KafkaConsumer, KafkaProducer
+from kafka import KafkaConsumer, KafkaProducer
 from kafka.admin import KafkaAdminClient, NewTopic
 
 from dockerfixtures import catalog
@@ -14,7 +13,7 @@ from dockerfixtures.container import Container
 def test_container_from_kafka_image_all_defaults(client):
     topic = 'topic'
     message_count = 20
-    max_attempts = 20
+
     with Container(catalog.PAPERLIB_KAFKA_2_3_1,
                    dockerclient=client,
                    max_wait=100,
@@ -24,7 +23,7 @@ def test_container_from_kafka_image_all_defaults(client):
                    ) as cntr:
         broker = '{}:9092'.format(cntr.address)
         # Wait for the container to be ready
-        cntr.wait(port=(9092, 'tcp'), timeout=0.5, max_retries=20)
+        cntr.wait((9092, 'tcp'), readyness_poll_interval=0.5, max_wait=20)
 
         # Create a topic to publish messages to
         kafka = KafkaAdminClient(bootstrap_servers=broker)
