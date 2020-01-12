@@ -2,6 +2,20 @@
 from dockerfixtures.image import DEFAULT_IMAGE_TAG, Image
 
 
+def test_image_attributes():
+    """Ensures basic attributes are assigned as expected
+    """
+    # Given
+    name = 'tralala'
+    tag = 'itou'
+    hash_ = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+    img = Image(name, tag=tag, hash_=hash_)
+
+    # When
+    assert img.tag == tag
+    assert img.name == name
+
+
 def test_image_environment_is_complete(dummy_env):
     # Given
     img = Image('tralala', tag='itou', environment=dummy_env)
@@ -27,20 +41,6 @@ def test_image_environment_is_not_shared(dummy_env):
 
     # Then
     assert default_env is not dummy_env
-
-
-def test_image_attributes():
-    """Ensures basic attributes are assigned as expected
-    """
-    # Given
-    name = 'tralala'
-    tag = 'itou'
-    hash_ = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-    img = Image(name, tag=tag, hash_=hash_)
-
-    # When
-    assert img.tag == tag
-    assert img.name == name
 
 
 def test_image_pullname_when_hash_given():

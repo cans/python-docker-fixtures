@@ -17,28 +17,35 @@ class Image:
     unspecified.
 
     """
-    __slots__ = ('__name', '__tag', '__hash', '__environment')
+    __slots__ = ('__name', '__tag', '__hash', '__environment', '__max_wait')
 
     def __init__(self,
                  name: str,
                  *,
-                 tag: str = DEFAULT_IMAGE_TAG,
                  hash_: str = None,
-                 environment: Mapping[str, Optional[str]] = None):
+                 max_wait: float = 5.0,
+                 tag: str = DEFAULT_IMAGE_TAG,
+                 environment: Mapping[str, Optional[str]] = None) -> None:
+        self.__environment = environment or dict()
+        self.__hash = hash_
+        self.__max_wait = max_wait
         self.__name = name
         self.__tag = tag
-        self.__hash = hash_
-        self.__environment = environment or dict()
+
+    @property
+    def default_environment(self) -> Dict[str, str]:
+        """The default values of the different environment variables the image declares
+        """
+        return {**self.__environment}
+
+    @property
+    def max_wait(self) -> float:
+        return self.__max_wait
 
     @property
     def name(self):
         """The name of the Image"""
         return self.__name
-
-    @property
-    def tag(self):
-        """The tag of the Image"""
-        return self.__tag
 
     @property
     def pullname(self):
@@ -51,13 +58,12 @@ class Image:
         return self.__name
 
     @property
-    def default_environment(self) -> Dict[str, str]:
-        """The default values of the different environment variables the image declares
-        """
-        return {**self.__environment}
+    def tag(self):
+        """The tag of the Image"""
+        return self.__tag
 
-    def check_command(self) -> List[Union[str,
-                                          placeholders.ContainerIDType]]:  # pylint: disable=no-self-use
+    def check_command(self) -> List[
+            Union[str, placeholders.ContainerIDType]]:  # pylint: disable=no-self-use
         """A command to run to ensure a container build from this image is up and ready
 
 
