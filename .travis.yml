@@ -1,6 +1,8 @@
 ---
 dist: bionic
 install:
+  - docker pull postgres:11
+  - docker pull paperlib/kafka:2.3.1
   - pip install -e .[dev]
 language: python
 python:
