@@ -247,7 +247,7 @@ class Container:
             raise ValueError('You did not provide a docker client !')
 
         try:
-            image = self.__client.images.get(self.__image.pullname)
+            image = self.__client.images.pull(self.__image.pullname)
         except docker.errors.ImageNotFound as exc:
             raise ImageNotFound("Image '{}' does not exist".format(self.__image.pullname)) from exc
 

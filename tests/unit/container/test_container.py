@@ -27,7 +27,7 @@ def test_container_environment_inherits_image_environment(dummy_env, client, run
     # Then
     client.containers.run.assert_called_once_with(command=None,
                                                   environment=dummy_env,
-                                                  image=client.images.get(image.pullname),
+                                                  image=client.images.pull(image.pullname),
                                                   **cntr.options)
 
 

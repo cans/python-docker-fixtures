@@ -78,7 +78,7 @@ def test_container_running_after_second_reload(mocker, client, container_running
 def test_container_run_raises_image_not_found_when_registry_says_so(mocker, client):
     # Given
     image = Image('')
-    mocker.patch.object(client.images, 'get', side_effect=docker.errors.ImageNotFound(''))
+    mocker.patch.object(client.images, 'pull', side_effect=docker.errors.ImageNotFound(''))
 
     # Ensure
     with pytest.raises(ImageNotFound):
