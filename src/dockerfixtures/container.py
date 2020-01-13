@@ -312,8 +312,9 @@ class Container:
 
             if not next_round_ports:
                 return True
-        raise TimeOut('Container taking too long to become ready (waited {:.2f}s.): {}'
+        raise TimeOut('Container taking too long to become ready (waited {:.2f}s.): {} {}'
                       .format(time.time() - then,
+                              self.address,
                               ', '.join(['{}/{}'.format(str(x[0]), x[1])
                                          for x in next_round_ports])))
 
