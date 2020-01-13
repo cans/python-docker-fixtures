@@ -12,7 +12,7 @@ import requests.exceptions
 from .image import Image
 
 _CONTAINER_DEFAULT_OPTIONS = dict(cap_add=['IPC_LOCK'],
-                                  mem_limit='256m',
+                                  # mem_limit='256m',
                                   # privileged=True,
                                   detach=True,
                                   publish_all_ports=True

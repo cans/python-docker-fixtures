@@ -17,13 +17,12 @@ def test_container_from_kafka_image_all_defaults(client):
     with Container(catalog.PAPERLIB_KAFKA_2_3_1,
                    dockerclient=client,
                    max_wait=100,
-                   options={'network': 'host',
-                            'ports': {'9092/tcp': 9092},
+                   options={'network_mode': 'host',
                             }
                    ) as cntr:
         broker = '{}:9092'.format(cntr.address)
         # Wait for the container to be ready
-        cntr.wait((9092, 'tcp'), readyness_poll_interval=0.5, max_wait=20)
+        cntr.wait((9092, 'tcp'), readyness_poll_interval=0.5)
 
         # Create a topic to publish messages to
         kafka = KafkaAdminClient(bootstrap_servers=broker)

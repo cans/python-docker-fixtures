@@ -33,9 +33,18 @@ __PAPERLIB_KAFKA_ENV = {'ADVERTISED_HOST': '127.0.0.1',
                         'KAFKA_HEAP_OPTS': '-Xmx256M -Xms256M',
                         'ZOOKEEPER_HEAP_OPTS': '-Xmx128M -Xms128M',
                         }
-PAPERLIB_KAFKA_LATEST = Image('paperlib/kafka', tag='latest', environment=__PAPERLIB_KAFKA_ENV)
-PAPERLIB_KAFKA_2_3_1 = Image('paperlib/kafka', tag='2.3.1', environment=__PAPERLIB_KAFKA_ENV)
-PAPERLIB_KAFKA_2_3_1_ALPINE = Image('paperlib/kafka', tag='2.3.1-alpine', environment=__PAPERLIB_KAFKA_ENV)
+PAPERLIB_KAFKA_LATEST = Image('paperlib/kafka',
+                              environment=__PAPERLIB_KAFKA_ENV,
+                              max_wait=20,
+                              tag='latest')
+PAPERLIB_KAFKA_2_3_1 = Image('paperlib/kafka',
+                             environment=__PAPERLIB_KAFKA_ENV,
+                             max_wait=20,
+                             tag='2.3.1')
+PAPERLIB_KAFKA_2_3_1_ALPINE = Image('paperlib/kafka',
+                                    environment=__PAPERLIB_KAFKA_ENV,
+                                    max_wait=20,
+                                    tag='2.3.1-alpine')
 
 __PG_ENV = {'POSTGRES_PASSWORD': '',
             'POSTGRES_DB': 'postgres',
