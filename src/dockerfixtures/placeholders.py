@@ -38,7 +38,7 @@ class _Placeholder:
         """
         self.__name = name
 
-    def __new__(cls, name: str):
+    def __new__(cls, name: str) -> '_Placeholder':
         if name in cls.__EXISTING_PLACEHOLDERS:
             return cls.__EXISTING_PLACEHOLDERS[name]
         placeholder = super().__new__(type(name + 'Type', (_Placeholder, ), {'__name': name}))

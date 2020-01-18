@@ -11,7 +11,7 @@ __CONFLUENT_KAFKA_ENV = {
                                    'LISTENERS_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-locahost}:9092'),
     'KAFKA_LISTENER_SECURITY_PROTOCOL_MAP': ('LISTENER_DOCKER_INTERNAL:PLAINTEXT,'
                                              'LISTENER_DOCKER_EXTERNAL:PLAINTEXT'),
-    'KAFKA_BROKER_ID': 1,
+    'KAFKA_BROKER_ID': '1',
 }
 CONFLUENT_KAFKA_5_0_0 = Image('confluentinc/kafka', tag='5.0.0', environment=__CONFLUENT_KAFKA_ENV)
 

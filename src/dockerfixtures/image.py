@@ -36,7 +36,7 @@ class Image:
     def default_environment(self) -> Dict[str, str]:
         """The default values of the different environment variables the image declares
         """
-        return {**self.__environment}
+        return {k: v for k, v in self.__environment.items() if v is not None}
 
     @property
     def max_wait(self) -> float:
@@ -63,7 +63,8 @@ class Image:
         return self.__tag
 
     def check_command(self) -> List[
-            Union[str, placeholders.ContainerIDType]]:  # pylint: disable=no-self-use
+            # Should be Union[str, placeholders.ContainerIDType]]:
+            Union[str, placeholders._Placeholder]]:  # pylint: disable=no-self-use
         """A command to run to ensure a container build from this image is up and ready
 
 

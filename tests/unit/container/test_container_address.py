@@ -1,6 +1,8 @@
 # -*- coding: utf-8; -*-
-from dockerfixtures.image import Image
+import pytest
+
 from dockerfixtures.container import Container
+from dockerfixtures.image import Image
 
 
 def test_container_address_when_no_network_settings(client, container_lacking_network_settings):
@@ -13,6 +15,16 @@ def test_container_address_when_no_network_settings(client, container_lacking_ne
 
     # Then
     assert address == 'localhost'
+
+
+def test_container_address_raises_runtime_error_when_not_started():
+    # Given
+    cntr = Container(Image(''))
+
+    # Ensure
+    with pytest.raises(RuntimeError):
+        # When
+        cntr.address
 
 
 # vim: et:sw=4:syntax=python:ts=4:
