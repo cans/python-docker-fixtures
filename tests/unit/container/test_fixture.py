@@ -13,14 +13,13 @@ def test_fixture_forwards_arguments(mocker):
     ports = ((5432, 'tcp', ), (5432, 'unix', ), )
 
     # When
-    for _ in container.fixture(img,
+    next(container.fixture(img,
                            *ports,
                            environment=env,
                            max_wait=maxwait,
                            options=opts,
                            readyness_poll_interval=interval,
-                           ):
-        pass
+                           ))
 
     # Then
     Container.assert_called_once_with(img, options=opts, environment=env)
