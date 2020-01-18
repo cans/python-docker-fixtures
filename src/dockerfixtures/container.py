@@ -74,6 +74,27 @@ def _port(port: str) -> Tuple[int, str]:
     return int(port), proto
 
 
+def _prune_dict(dictionary: Mapping[Any, Optional[Any]]) -> Mapping[Any, Any]:
+    """Removes None values from possibly nested dict.
+
+    Note: this function does not prune structures others than dict,
+      for example print_dict({'k': [None, None]}) will not remove the
+      None in the list.
+
+    """
+    res = {}
+    for key, value in dictionary.items():
+        if value is None:
+            continue
+        if isinstance(value, dict):
+            value = _prune_dict(value)
+            if len(value) > 0:
+                res[key] = value
+        else:
+            res[key] = value
+    return res
+
+
 class Container:
     """Represents a container
     """
@@ -319,25 +340,16 @@ class Container:
                                          for x in next_round_ports])))
 
 
-def _prune_dict(dictionary: Mapping[Any, Optional[Any]]) -> Mapping[Any, Any]:
-    """Removes None values from possibly nested dict.
-
-    Note: this function does not prune structures others than dict,
-      for example print_dict({'k': [None, None]}) will not remove the
-      None in the list.
-
-    """
-    res = {}
-    for key, value in dictionary.items():
-        if value is None:
-            continue
-        if isinstance(value, dict):
-            value = _prune_dict(value)
-            if len(value) > 0:
-                res[key] = value
-        else:
-            res[key] = value
-    return res
+def fixture(image: Image,
+            *ports: Tuple[int, str],
+            environment: Optional[Mapping[str, str]] = None,
+            max_wait: Optional[float] = None,
+            options: Optional[Mapping[str, Any]] = None,
+            readyness_poll_interval: Optional[float] = None,
+            ) -> None:
+    with Container(image, options=options, environment=environment) as cntr:
+        cntr.wait(*ports, max_wait=max_wait, readyness_poll_interval=readyness_poll_interval)
+        yield  # Do not yield the container, not need if container is reachable through the network
 
 
 # vim: et:sw=4:syntax=python:ts=4:

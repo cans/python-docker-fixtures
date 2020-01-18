@@ -15,4 +15,22 @@ scratch. But after trying to make heads and tails of them
 when faced with bugs, I ended-up finding simpler to start
 over.
 
+Using dockerfixtures with pytest
+================================
 
+To spawn a container in your tests, proceed as follow:
+
+
+.. code:: Python
+
+    from dockerfixtures import Image, Container
+    import pytest
+
+
+    @pytest.fixture(scope='session')
+    def some_image():
+        return image.Image('postgres', tags='12')
+       
+    @pytest.fixture(scope='session')
+    def some_container_fixture(some_image):
+        yield from container.fixture(some_image)
