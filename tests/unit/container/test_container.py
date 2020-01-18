@@ -1,8 +1,8 @@
 # -*- coding: utf-8; -*-
 import pytest
 
-from dockerfixtures.image import Image
 from dockerfixtures.container import _CONTAINER_DEFAULT_OPTIONS, Container
+from dockerfixtures.image import Image
 
 
 def test_container_image_attribute_is_set():

@@ -2,8 +2,8 @@
 import pytest
 from requests import exceptions
 
-from dockerfixtures.image import Image
 from dockerfixtures.container import Container
+from dockerfixtures.image import Image
 
 
 def test_container_kill_raises_when_response_is_404(mocker, client, running_container):

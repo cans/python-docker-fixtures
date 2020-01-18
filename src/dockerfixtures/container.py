@@ -11,6 +11,7 @@ import requests.exceptions
 
 from .image import Image
 
+
 _CONTAINER_DEFAULT_OPTIONS = dict(cap_add=['IPC_LOCK'],
                                   # mem_limit='256m',
                                   # privileged=True,
@@ -303,7 +304,7 @@ class Container:
         return self.__container.id
 
     def wait(self,
-             *ports: Tuple[Tuple[int, str], ...],
+             *ports: Tuple[int, str],
              max_wait: float = None,
              readyness_poll_interval: float = 0.1,
              ) -> None:
@@ -317,7 +318,7 @@ class Container:
 
         then = time.time()
         while (time.time() - then) < max_wait:
-            ports = next_round_ports
+            ports: List[Tuple[int, str]] = next_round_ports
             next_round_ports = []
 
             for port, proto in ports:
@@ -330,7 +331,7 @@ class Container:
                     time.sleep(readyness_poll_interval)
 
             if not next_round_ports:
-                return True
+                return
         raise TimeOut('Container taking too long to become ready (waited {:.2f}s.): {} {}'
                       .format(time.time() - then,
                               self.address,

@@ -1,8 +1,8 @@
 # -*- coding: utf-8; -*-
 import pytest
 
-from dockerfixtures.image import Image
 from dockerfixtures.container import Container
+from dockerfixtures.image import Image
 
 
 def test_container_remove_when_not_started():

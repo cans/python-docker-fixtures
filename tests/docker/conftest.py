@@ -1,7 +1,7 @@
 # -*- coding: utf-8; -*-
-import docker
 import logging
 
+import docker
 import pytest
 
 
