@@ -3,11 +3,20 @@ Docker containers as test fixtures made easy
 ============================================
 
 .. image:: https://travis-ci.com/cans/python-docker-fixtures.svg?branch=master
-    :target: https://travis-ci.com/cans/python-docker-fixtures
+   :target: https://travis-ci.com/cans/python-docker-fixtures
 .. image:: https://circleci.com/gh/cans/python-docker-fixtures.svg?style=svg
-    :target: https://circleci.com/gh/cans/python-docker-fixtures
+   :target: https://circleci.com/gh/cans/python-docker-fixtures
 .. image:: https://codecov.io/gh/cans/python-docker-fixtures/branch/master/graph/badge.svg
   :target: https://codecov.io/gh/cans/python-docker-fixtures
+.. image:: https://img.shields.io/lgtm/alerts/g/cans/python-docker-fixtures.svg?logo=lgtm&logoWidth=18
+   :alt: Total alerts
+   :target: https://lgtm.com/projects/g/cans/python-docker-fixtures/alerts/
+.. image:: https://img.shields.io/lgtm/grade/python/g/cans/python-docker-fixtures.svg?alt=&logo=lgtm&logoWidth=18
+   :alt: Language grade%3A Python
+   :target: https://lgtm.com/projects/g/cans/python-docker-fixtures/context%3Apython
+.. image:: https://codescene.io/projects/6675/status.svg
+   :alt: Get more details at **codescene.io**.
+   :target: https://codescene.io/projects/6675/jobs/latest-successful/results
 
 
 This package was inspired by others, but was written from

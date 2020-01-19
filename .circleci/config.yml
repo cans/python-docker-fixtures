@@ -3,6 +3,7 @@ version: 2.1
 
 orbs:
   codecov: codecov/codecov@1.0.2
+  codescene-ci-cd: empear/codescene-ci-cd@1.0.0
 
 jobs:
   test:
@@ -88,6 +89,10 @@ workflows:
         name: "test3.7"
         pyversion: "3.7"
 
+    - codescene-ci-cd/run-delta-analysis:
+        name: codescene
+        context: codescene-ci-cd
+
     # Not available yet
     # - test:
     #     name: "test3.8"
@@ -95,6 +100,7 @@ workflows:
 
     - package:
         requires:
+          - codescene
           - test3.6
           - test3.7
           # - test3.8
