@@ -3,13 +3,15 @@ import logging
 import socket
 import subprocess
 import time
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, cast, Dict, Generator, List, Mapping, Optional, Tuple, Union
 import warnings
 
 import docker
+from docker.models import images
 import requests.exceptions
 
 from .image import Image
+
 
 _CONTAINER_DEFAULT_OPTIONS = dict(cap_add=['IPC_LOCK'],
                                   # mem_limit='256m',
@@ -59,19 +61,19 @@ def _port(port: str) -> Tuple[int, str]:
     """Transforms ports in the '<port>/<proto>' syntax into a tuple.
     """
     if '/' in port:
-        port, proto = port.split('/')
+        port_, proto = port.split('/')  # type: Tuple[str, Optional[str]]
     else:
-        port, proto = port, None
+        port_, proto = port, None
 
     if not proto:
-        return int(port), 'tcp'
+        return int(port_), 'tcp'
     if proto not in _SUPPORTED_NETWORK_PROTOCOLS:
         raise UnsupportedNetworkProtocol("Protocol '{}' is not supported, only {} are."
                                          .format(proto,
                                                  ' and '.join([
                                                      ', '.join(_SUPPORTED_NETWORK_PROTOCOLS[:-1]),
                                                      *_SUPPORTED_NETWORK_PROTOCOLS[:-1]])))
-    return int(port), proto
+    return int(port_), proto
 
 
 def _prune_dict(dictionary: Mapping[Any, Optional[Any]]) -> Mapping[Any, Any]:
@@ -124,7 +126,7 @@ class Container:
                  *,
                  command: Optional[Union[str, List[str]]] = None,
                  dockerclient: docker.client.DockerClient = None,
-                 environment: Dict[str, str] = None,
+                 environment: Mapping[str, str] = None,
                  max_wait: float = 10.0,
                  options=None,
                  startup_poll_interval: float = 1,
@@ -160,6 +162,8 @@ class Container:
     def address(self) -> str:
         """Returns the container's IP address
         """
+        if self.__container is None:
+            raise RuntimeError("Container not started, it can't have an address yet.")
         try:
             network = self.__container.attrs['NetworkSettings']
             ip = network['IPAddress']
@@ -226,12 +230,17 @@ class Container:
             {'<port>/proto': (<effective port>, 'proto'), }
 
         """
+        # helps mypy understand the self.__client.images ... below
+        # it can't guess that self.__container not None => self.__client not None.
+        assert self.__client is not None
+
         if self.__container is not None:
-            image = self.__container.image
+            image = self.__container.image  # type: images.Image
         else:
-            image_meta = self.__client.images.get_registry_data(name=self.__image.pullname)
-            assert image_meta.attrs['Descriptor']['mediaType'] in SUPPORTED_MANIFEST_TYPES
-            image = image_meta.pull()
+            imagemeta: images.RegistryData = self.__client.images.get_registry_data(
+                name=self.__image.pullname)
+            assert imagemeta.attrs['Descriptor']['mediaType'] in SUPPORTED_MANIFEST_TYPES
+            image = cast(images.Image, imagemeta.pull())
         # Get list of exposed ports
         ports = {k: _port(k) for k, v in image.attrs.get('ExposedPorts', {}).items()}
         # Update with the possible port mapping(s)
@@ -303,10 +312,10 @@ class Container:
         return self.__container.id
 
     def wait(self,
-             *ports: Tuple[Tuple[int, str], ...],
+             *ports: Tuple[int, str],
              max_wait: float = None,
              readyness_poll_interval: float = 0.1,
-             ) -> None:
+             ) -> bool:
         """Waits for the container to be listening on some network ports.
         """
         if not ports:
@@ -317,10 +326,10 @@ class Container:
 
         then = time.time()
         while (time.time() - then) < max_wait:
-            ports = next_round_ports
+            ports_to_check = next_round_ports
             next_round_ports = []
 
-            for port, proto in ports:
+            for port, proto in ports_to_check:
                 try:
                     sock_proto = socket.SOCK_STREAM if proto == 'tcp' else socket.SOCK_DGRAM
                     with socket.socket(socket.AF_INET, sock_proto) as sock:
@@ -344,7 +353,7 @@ def fixture(image: Image,
             max_wait: Optional[float] = None,
             options: Optional[Mapping[str, Any]] = None,
             readyness_poll_interval: Optional[float] = None,
-            ) -> None:
+            ) -> Generator[None, None, None]:
     with Container(image, options=options, environment=environment) as cntr:
         cntr.wait(*ports, max_wait=max_wait, readyness_poll_interval=readyness_poll_interval)
         yield  # Do not yield the container, not need if container is reachable through the network

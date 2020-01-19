@@ -2,8 +2,8 @@
 import docker.errors
 import pytest
 
-from dockerfixtures.image import Image
 from dockerfixtures.container import Container, ImageNotFound, TimeOut
+from dockerfixtures.image import Image
 
 
 def test_container_paused_then_running(mocker, client, container_paused_after_1st_reload):

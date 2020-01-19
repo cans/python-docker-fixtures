@@ -13,6 +13,7 @@ from dockerfixtures.container import _port, UnsupportedNetworkProtocol
 def test__port(port, expected):
     # When
     res = _port(port)
+
     # Then
     assert res == expected
 

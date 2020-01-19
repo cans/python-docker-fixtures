@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
-from dockerfixtures.image import Image
 from dockerfixtures.container import Container
+from dockerfixtures.image import Image
 
 
 def test_container_ports_when_image_already_available(mocker, client, running_container):

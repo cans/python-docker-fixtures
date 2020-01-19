@@ -4,8 +4,8 @@ from unittest import mock
 
 import pytest
 
-from dockerfixtures.image import Image
 from dockerfixtures.container import Container, TimeOut
+from dockerfixtures.image import Image
 
 
 def test_container_wait_when_service_does_not_start_fast_enough(mocker):
