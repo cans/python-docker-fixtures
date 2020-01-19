@@ -104,7 +104,7 @@ class Container:
                  command: Optional[Union[str, List[str]]] = None,
                  dockerclient: docker.client.DockerClient = None,
                  environment: Dict[str, str] = None,
-                 max_wait: int = 10,
+                 max_wait: float = 10.0,
                  options=None,
                  startup_poll_interval: float = 1,
                  readyness_poll_interval: float = 0.2,
@@ -113,7 +113,7 @@ class Container:
 
         TODO: Build container from an ID ? (restart paused container)
         """
-        assert max_wait >= 0
+        assert max_wait > 0.0
         self.__client = dockerclient
         self.__command = None
         self.__container = None
@@ -261,7 +261,8 @@ class Container:
                                                         environment=self.__environment,
                                                         **self.options,
                                                         )
-        for _ in range(self.__max_wait):
+        then = time.time()
+        while (time.time() - then) < self.__max_wait:
             self.__container.reload()
             logging.getLogger(__name__).debug('Container %s status is %s',
                                               self.__container.id,
@@ -270,16 +271,13 @@ class Container:
                 break
             elif self.__container.status in _CONTAINER_STATUSES_KO:
                 raise RuntimeError('Container stopped prematurely')
-            elif self.__container.status in _CONTAINER_STATUSES_WAIT:
-                time.sleep(self.__startup_poll_interval)  # pylint: disable=expression-not-assigned
-            else:
+            elif self.__container.status not in _CONTAINER_STATUSES_WAIT:
                 warnings.warn('Unknown container status!', RuntimeWarning)
 
+            time.sleep(self.__startup_poll_interval)  # pylint: disable=expression-not-assigned
         else:
-            self.__container.reload()
-            if self.__container.status not in _CONTAINER_STATUSES_OK:
-                raise TimeOut('Container {} is taking too long to start'
-                              .format(self.__container.id))
+            raise TimeOut('Container {} is taking too long to start'
+                          .format(self.__container.id))
 
         return self.__container.id
 
