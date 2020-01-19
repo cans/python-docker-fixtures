@@ -59,7 +59,7 @@ jobs:
 
   package:
     docker:
-    - image: python:3.7-slim
+    - image: python:<<parameters.pyversion>>-slim
     parameters:
       pypiapitoken:
         type: string
@@ -70,7 +70,23 @@ jobs:
     steps:
     - checkout
     - restore_cache:
-        key: venv-{{ checksum "setup.cfg" }}-<< parameters.pyversion >>-v2
+        key: venv-{{ checksum "setup.cfg" }}-packaging-<< parameters.pyversion >>-v2
+    - run:
+        name: "Configure Packaging Virtual environment"
+        command: |
+          if [ -d ~/.venv ]
+          then
+              :  # virtual environment restored from cache
+          else
+              python -m venv ~/.venv
+              . ~/.venv/bin/activate
+              pip install -e '.[dev]'
+          fi
+    - save_cache:
+        key: venv-{{ checksum "setup.cfg" }}-packaging-<< parameters.pyversion >>-v2
+        paths:
+          - ~/.venv
+          - ~/docker-fixtures/src/dockerfixtures.egg-info
     - run:
         name: "Build and Upload Package"
         command: |
