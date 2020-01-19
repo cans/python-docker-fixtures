@@ -120,7 +120,7 @@ def image_metadata(docker_image):
 @pytest.fixture
 def docker_image():
     image = mock.Mock()
-    image.attrs = {'ExposedPorts': {'1234/tcp': {}},}
+    image.attrs = {'ExposedPorts': {'1234/tcp': {}}, }
     return image
 
 
