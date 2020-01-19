@@ -19,7 +19,7 @@ def test_container_image_attribute_is_set():
 def test_container_environment_inherits_image_environment(dummy_env, client, running_container):
     # Given
     image = Image('', environment=dummy_env)
-    cntr = Container(image, startup_poll_interval=0.0)
+    cntr = Container(image, max_wait=1.0)
 
     # When
     cntr.run(dockerclient=client)
@@ -59,7 +59,7 @@ def test_container_as_a_context_manager(client, running_container):
     image = Image('')
 
     # When
-    with Container(image, dockerclient=client, max_wait=0):
+    with Container(image, dockerclient=client, max_wait=1.0):
         pass
 
     assert client.containers.run.called
@@ -82,7 +82,7 @@ def test_container_as_a_context_manager_raises_if_no_client():
 def test_container_as_a_context_manager_reraises_exception(client, running_container):
     # Given
     image = Image('')
-    cntr = Container(image, dockerclient=client, max_wait=0)
+    cntr = Container(image, dockerclient=client, max_wait=1.0)
 
     # Ensure
     with pytest.raises(Exception, match='^1234$'):
