@@ -147,7 +147,7 @@ jobs:
     - run:
         name: "Build and Upload Package"
         command: |
-          ./.circleci/package-publish.sh
+          ./.circleci/package-publish.sh "<< parameters.pypirepository >>" "<< parameters.pypiapitoken >>"
     working_directory: ~/docker-fixtures
 
 
