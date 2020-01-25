@@ -7,7 +7,7 @@ from dockerfixtures import container as c
 
 
 @pytest.fixture
-def client(container):
+def client(container, docker_image):
     """A mock :class:`~docker.client.DockerClient`
 
     Has the following methods mocked:
@@ -15,6 +15,7 @@ def client(container):
 
     """
     mock_client = mock.Mock()
+    mock_client.images.pull = mock.Mock(return_value=docker_image)
     mock_client.containers.run = mock.Mock(return_value=container)
 
     return mock_client
@@ -35,6 +36,15 @@ def container():
     container_.status = 'created'
 
     return container_
+
+
+@pytest.fixture
+def container_w_command(running_container):
+    """A docker container object mock-up (as produced by the docker library)
+    """
+    running_container.image.attrs.pop('Config')
+
+    return running_container
 
 
 @pytest.fixture
@@ -120,7 +130,8 @@ def image_metadata(docker_image):
 @pytest.fixture
 def docker_image():
     image = mock.Mock()
-    image.attrs = {'ExposedPorts': {'1234/tcp': {}}, }
+    image.attrs = {'ExposedPorts': {'1234/tcp': {}},
+                   'Config': {'Entrypoint': ['abc'], }, }
     return image
 
 
