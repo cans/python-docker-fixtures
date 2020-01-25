@@ -121,6 +121,12 @@ class Container:
         if exc_value:
             raise exc_value
 
+    @staticmethod
+    def __has_entrypoint(image):
+        return ('Config' in image.attrs
+                and 'Entrypoint' in image.attrs['Config']
+                and image.attrs['Config']['Entrypoint'])
+
     def __init__(self,
                  image: Image,
                  *,
@@ -138,7 +144,7 @@ class Container:
         """
         assert max_wait > 0.0
         self.__client = dockerclient
-        self.__command = None
+        self.__command = command
         self.__container = None
         self.__environment = _prune_dict({** image.default_environment, **(environment or dict())})
         self.__image = image
@@ -286,11 +292,17 @@ class Container:
                                                  'environment': self.__environment,
                                                  'options': self.options,
                                                  })
-        self.__container = self.__client.containers.run(command=command or self.__command,
-                                                        image=image,
-                                                        environment=self.__environment,
-                                                        **self.options,
-                                                        )
+        run_args = {'image': image,
+                    'environment': self.__environment,
+                    **self.options,
+                    }
+        if self.__has_entrypoint(image):
+            run_args['entrypoint'] = command or self.__command
+        else:
+            run_args['command'] = command or self.__command
+
+        self.__container = self.__client.containers.run(**run_args)
+
         then = time.time()
         while (time.time() - then) < self.__max_wait:
             self.__container.reload()
@@ -347,16 +359,22 @@ class Container:
                                          for x in next_round_ports])))
 
 
-def fixture(image: Image,
+def fixture(dockerclient: docker.client.DockerClient,
+            image: Image,
             *ports: Tuple[int, str],
+            command: Optional[Union[str, List[str]]] = None,
             environment: Optional[Mapping[str, str]] = None,
             max_wait: Optional[float] = None,
             options: Optional[Mapping[str, Any]] = None,
             readyness_poll_interval: Optional[float] = None,
             ) -> Generator[None, None, None]:
-    with Container(image, options=options, environment=environment) as cntr:
+    with Container(image,
+                   command=command,
+                   dockerclient=dockerclient,
+                   options=options,
+                   environment=environment) as cntr:
         cntr.wait(*ports, max_wait=max_wait, readyness_poll_interval=readyness_poll_interval)
-        yield  # Do not yield the container, not need if container is reachable through the network
+        yield cntr
 
 
 # vim: et:sw=4:syntax=python:ts=4:

@@ -119,4 +119,21 @@ def test_container_run_times_out(mocker, client, container):
     # Then
     assert container.reload.call_count == 0
 
+
+def test_container_run_when_image_as_command(client, container_w_command):
+    # Given
+    image = Image('')
+    img = client.images.pull()
+    cntr = Container(image, startup_poll_interval=0.0)
+
+    # When
+    cntr.run(dockerclient=client)
+
+    # Then
+    client.containers.run.assert_called_once_with(image=img,
+                                                  command=None,
+                                                  environment={},
+                                                  **cntr.options)
+
+
 # vim: et:sw=4:syntax=python:ts=4:
