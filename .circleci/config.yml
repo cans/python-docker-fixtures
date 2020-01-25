@@ -15,97 +15,204 @@ jobs:
         default: "3.7"
 
     steps:
-      - checkout
-      - restore_cache:
-          key: venv-{{ checksum "setup.cfg" }}-v1
-      - run:
-          name: setup environment
-          command: |
-            if [ -d ~/.venv ]
-            then
-                echo "Virtual environment restored from cache"
-            else
-                eval "$(pyenv init -)"
-                pyenv shell $(pyenv versions | sed -nEe 's/^([^0-9]+)('"`echo "<< parameters.pyversion >>" | sed -e 's/\./\./'`"'\.[0-9]+)(.*)/\2/p')
-                python -m venv ~/.venv
-                . ~/.venv/bin/activate
-                pip install -U -e .[dev]
-            fi
+    - checkout
+    - restore_cache:
+        key: venv-{{ checksum "setup.cfg" }}-<< parameters.pyversion >>-v2
+    - run:
+        name: setup environment
+        command: |
+          ./.circleci/test-venv.sh "<< parameters.pyversion >>"
 
-      - save_cache:
-          key: venv-{{ checksum "setup.cfg" }}-<< parameters.pyversion >>-v1
-          paths:
-            - ~/.venv
+    - save_cache:
+        key: venv-{{ checksum "setup.cfg" }}-<< parameters.pyversion >>-v2
+        paths:
+        - ~/.venv
+        - ~/docker-fixtures/src/dockerfixtures.egg-info
 
-      - run:
-          name: Run tests
-          command: |
-            . ~/.venv/bin/activate
-            pytest --cov-report=xml --junitxml=test-reports/junit.xml
+    - run:
+        name: Run tests
+        command: |
+          . ~/.venv/bin/activate
+          pytest --cov-report=xml --junitxml=test-reports/junit.xml
 
-      - store_test_results:
-          path: test-reports
+    - store_test_results:
+        path: test-reports
 
-      - codecov/upload:
-          file: coverage.xml
+    - store_artifacts:
+        path: coverage.xml
+        destiation: coverage
+
+    - codecov/upload:
+        file: coverage.xml
 
     working_directory: ~/docker-fixtures
 
 
   package:
     docker:
-      - image: python:3.7-slim
+    - image: python:<<parameters.pyversion>>
+    parameters:
+      pypiapitoken:
+        type: string
+        default: "${PYPI_TEST_API_TOKEN}"
+      pypirepository:
+        type: string
+        default: "${PYPI_TEST_REPOSITORY}"
+      pyversion:
+        type: string
+        default: "3.7"
     steps:
-      - checkout
-      - run:
-          name: "Build and Upload Package"
-          command: |
-            python setup.py sdist bdist_wheel
-            cat > ~/.pypirc \<<HERE
-            [distutils]
-            index-servers =
-              pypi
-
-            [pypi]
-            repository=https://test.pypi.org/legacy/
-            username = ${CANS_PYPI_CIRCLECI_USERNAME}
-            password = ${CANS_PYPI_CIRCLECI_PASSWORD}
-            HERE
-            twine upload -r pypi dist/*.whl
-            rm ~/.pypirc
+    - checkout
+    - restore_cache:
+        key: venv-{{ checksum "setup.cfg" }}-packaging-<< parameters.pyversion >>-v3
+    - run:
+        name: "Configure Packaging Virtual environment"
+        command: |
+          ./.circleci/package-venv.sh "<< parameters.pyversion >>"
+    - save_cache:
+        key: venv-{{ checksum "setup.cfg" }}-packaging-<< parameters.pyversion >>-v3
+        paths:
+          - ~/.venv
+          - ~/docker-fixtures/src/dockerfixtures.egg-info
+    - attach_workspace:
+        at: /tmp/workspace
+    - run:
+        name: "Build and Upload Package"
+        command: |
+          ./.circleci/package-build.sh "<< parameters.pypirepository >>" "<< parameters.pypiapitoken >>"
+    - persist_to_workspace:
+        root: /tmp/workspace
+        paths:
+        - version
+        - '*.whl'
     working_directory: ~/docker-fixtures
 
+  validate_package:
+    description: |
+      Ensure the produced package is valide and self sufficient
+
+      Meaning:
+      - it can be installed
+      - no development dependency made its way into the package itself
+    machine:
+      image: circleci/classic:201808-01
+    parameters:
+      pyversion:
+        type: string
+        default: "3.7"
+
+    steps:
+    - checkout
+    - attach_workspace:
+        at: /tmp/workspace
+    - restore_cache:
+        key: pkg-{{ checksum "setup.cfg" }}-validating-<< parameters.pyversion >>-v0
+    - restore_cache:
+        key: venv-{{ checksum "setup.cfg" }}-validating-<< parameters.pyversion >>-v0
+    - run:
+        name: setup environment
+        command: |
+          ./.circleci/package-validate-venv.sh "<< parameters.pyversion >>"
+    - save_cache:
+        key: pkg-{{ checksum "setup.cfg" }}-validating-<< parameters.pyversion >>-v0
+        paths:
+        - ~/package-cache/
+
+    - save_cache:
+        key: venv-{{ checksum "setup.cfg" }}-validating-<< parameters.pyversion >>-v0
+        paths:
+        - ~/package-cache/
+
+    - run:
+        name: "Ensure package is valid"
+        command: |
+          ./.circleci/package-validate.sh
 
 workflows:
   version: 2
   test-and-package:
+    parameters:
+      pypirepository:
+        type: string
+        default: "${PYPI_TEST_REPOSITORY}"
     jobs:
     - test:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
         name: "test3.6"
         pyversion: "3.6"
 
     - test:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
         name: "test3.7"
         pyversion: "3.7"
 
     # Not available yet
     # - test:
+    #     filters:
+    #       tags:
+    #         only:
+    #         - /v[0-9]+\.[0-9]+\.[0-9]+/
     #     name: "test3.8"
     #     pyversion: "3.8"
 
     - package:
-        requires:
-          - test3.6
-          - test3.7
-          # - test3.8
         filters:
-          branches:
-            ignore:
-              - /.*/
+          # branches:
+          #   ignore:
+          #   - /.*/
           tags:
             only:
-              - /v[0-9]+\.[0-9]+\.[0-9]+/
-        context: py-package
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Build package"
+        requires:
+        - test3.6
+        - test3.7
+        # - test3.8
+        pyversion: "3.7"
+        pypirepository: "${PYPI_TEST_REPOSITORY}"
+
+    - validate_package:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Validate Package with Python 3.6"
+        pyversion: "3.6"
+        requires:
+        - "Build package"
+
+    - validate_package:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Validate Package with Python 3.7"
+        pyversion: "3.7"
+        requires:
+        - "Build package"
+
+    - package:
+        name: "Publish package"
+        filters:
+          branches:
+            only:
+            - /master/
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        pyversion: "3.7"
+        pypiapitoken: "${PYPI_API_TOKEN}"
+        pypirepository: "https://upload.pypi.org/legacy/"
+        requires:
+        - "Validate Package with Python 3.6"
+        - "Validate Package with Python 3.7"
+        # - "Validate Package with Python 3.8"
 
 
 # vim: et:sw=2:syntax=2:ts=2:
