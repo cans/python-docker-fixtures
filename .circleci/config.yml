@@ -48,16 +48,10 @@ jobs:
     working_directory: ~/docker-fixtures
 
 
-  package:
+  build_package:
     docker:
     - image: python:<<parameters.pyversion>>
     parameters:
-      pypiapitoken:
-        type: string
-        default: "${PYPI_TEST_API_TOKEN}"
-      pypirepository:
-        type: string
-        default: "${PYPI_TEST_REPOSITORY}"
       pyversion:
         type: string
         default: "3.7"
@@ -79,7 +73,7 @@ jobs:
     - run:
         name: "Build and Upload Package"
         command: |
-          ./.circleci/package-build.sh "<< parameters.pypirepository >>" "<< parameters.pypiapitoken >>"
+          ./.circleci/package-build.sh
     - persist_to_workspace:
         root: /tmp/workspace
         paths:
@@ -128,6 +122,35 @@ jobs:
         command: |
           ./.circleci/package-validate.sh
 
+  publish_package:
+    docker:
+    - image: python:<<parameters.pyversion>>
+    parameters:
+      pyversion:
+        type: string
+        default: "3.7"
+      pypiapitoken:
+        type: string
+        default: "${PYPI_TEST_API_TOKEN}"
+      pypirepository:
+        type: string
+        default: "${PYPI_TEST_REPOSITORY}"
+
+    steps:
+    - checkout
+    - restore_cache:
+        key: venv-{{ checksum "setup.cfg" }}-packaging-<< parameters.pyversion >>-v3
+
+    - attach_workspace:
+        at: /tmp/workspace
+
+    - run:
+        name: "Build and Upload Package"
+        command: |
+          ./.circleci/package-publish.sh
+    working_directory: ~/docker-fixtures
+
+
 workflows:
   version: 2
   test-and-package:
@@ -161,7 +184,7 @@ workflows:
     #     name: "test3.8"
     #     pyversion: "3.8"
 
-    - package:
+    - build_package:
         filters:
           # branches:
           #   ignore:
@@ -175,7 +198,6 @@ workflows:
         - test3.7
         # - test3.8
         pyversion: "3.7"
-        pypirepository: "${PYPI_TEST_REPOSITORY}"
 
     - validate_package:
         filters:
@@ -197,7 +219,7 @@ workflows:
         requires:
         - "Build package"
 
-    - package:
+    - publish_package:
         name: "Publish package"
         filters:
           branches:
@@ -215,4 +237,4 @@ workflows:
         # - "Validate Package with Python 3.8"
 
 
-# vim: et:sw=2:syntax=2:ts=2:
+# vim: et:sw=2:syntax=yaml:ts=2:
