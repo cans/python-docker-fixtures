@@ -17,7 +17,7 @@ username = __token__
 password = ${2}
 HERE
 
-    twine upload -r pypi dist/*.whl
+    twine upload -r pypi /tmp/workspace/*.whl
     rm ~/.pypirc
 else
     printf '\033[0;31mNot uploading the package, it appears to be a development one.\033[0m\n'
