@@ -23,24 +23,29 @@ To spawn a container in your tests, proceed as follow:
 
 .. code-block:: Python
 
+    import docker
     from dockerfixtures import image, container
     import pytest
 
+    @pytest.fixture(scope='session')
+    def docker_client():
+         return docker.from_env()
 
     @pytest.fixture(scope='session')
     def pg_image() -> image.Image:
         return image.Image('postgres', tags='12')
 
     @pytest.fixture(scope='function')
-    def pg_container(pg_image: image.Image) -> container.Container:
-        yield from container.fixture(some_image)
+    def pg_container(docker_client: docker.client.DockerClient,
+                     pg_image: image.Image) -> container.Container:
+        yield from container.fixture(docker_client, some_image)
 
     # If you don't need to reuse the image
 
     @pytest.fixture(scope='session')
-    def pg_container() -> container.Container:
+    def pg_container(docker_client) -> container.Container:
         some_image = image.Image('postgres', tags='12')
-        yield from container.fixture(some_image)
+        yield from container.fixture(docker_client, some_image)
 
 
 Why not a pytest plugin ?
