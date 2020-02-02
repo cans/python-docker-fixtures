@@ -373,7 +373,9 @@ def fixture(dockerclient: docker.client.DockerClient,
                    dockerclient=dockerclient,
                    options=options,
                    environment=environment) as cntr:
-        cntr.wait(*ports, max_wait=max_wait, readyness_poll_interval=readyness_poll_interval)
+        wait_kwargs = dict(max_wait=max_wait, readyness_poll_interval=readyness_poll_interval)
+        _prune_dict(wait_kwargs)
+        cntr.wait(*ports, **wait_kwargs)
         yield cntr
 
 
