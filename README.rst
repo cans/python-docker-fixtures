@@ -2,12 +2,21 @@
 Docker containers as test fixtures made easy
 ============================================
 
+.. image:: https://badge.fury.io/py/dockerfixtures.svg
+    :alt: Latest version on Pypi: ?
+    :target: https://badge.fury.io/py/dockerfixtures
+.. image:: https://img.shields.io/pypi/pyversions/dockerfixtures.svg
+    :alt: Supported Python versions: ?
+    :target: https://pypi.org/project/dockerfixtures
 .. image:: https://travis-ci.com/cans/python-docker-fixtures.svg?branch=master
+    :alt: Build status (travis.com): ?
     :target: https://travis-ci.com/cans/python-docker-fixtures
 .. image:: https://circleci.com/gh/cans/python-docker-fixtures.svg?style=svg
+    :alt: Build status (circleci.com): ?
     :target: https://circleci.com/gh/cans/python-docker-fixtures
 .. image:: https://codecov.io/gh/cans/python-docker-fixtures/branch/master/graph/badge.svg
-  :target: https://codecov.io/gh/cans/python-docker-fixtures
+    :alt: Test coverage: ? %
+    :target: https://codecov.io/gh/cans/python-docker-fixtures
 
 
 This package was inspired by others, but was written from
@@ -23,24 +32,29 @@ To spawn a container in your tests, proceed as follow:
 
 .. code-block:: Python
 
+    import docker
     from dockerfixtures import image, container
     import pytest
 
+    @pytest.fixture(scope='session')
+    def docker_client():
+         return docker.from_env()
 
     @pytest.fixture(scope='session')
     def pg_image() -> image.Image:
         return image.Image('postgres', tags='12')
 
     @pytest.fixture(scope='function')
-    def pg_container(pg_image: image.Image) -> container.Container:
-        yield from container.fixture(some_image)
+    def pg_container(docker_client: docker.client.DockerClient,
+                     pg_image: image.Image) -> container.Container:
+        yield from container.fixture(docker_client, some_image)
 
     # If you don't need to reuse the image
 
     @pytest.fixture(scope='session')
-    def pg_container() -> container.Container:
+    def pg_container(docker_client) -> container.Container:
         some_image = image.Image('postgres', tags='12')
-        yield from container.fixture(some_image)
+        yield from container.fixture(docker_client, some_image)
 
 
 Why not a pytest plugin ?
