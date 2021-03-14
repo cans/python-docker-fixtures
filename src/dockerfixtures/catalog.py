@@ -46,12 +46,12 @@ PAPERLIB_KAFKA_2_3_1_ALPINE = Image('paperlib/kafka',
                                     max_wait=20,
                                     tag='2.3.1-alpine')
 
-__PG_ENV = {'POSTGRES_PASSWORD': '',
+__PG_ENV = {'PGDATA': None,
             'POSTGRES_DB': 'postgres',
-            'POSTGRES_USER': 'postgres',
             'POSTGRES_INITDB_ARGS': None,
             'POSTGRES_INITDB_WALDIR': None,
-            'PGDATA': None,
+            # 'POSTGRES_PASSWORD': '',  # Warning: must be set for the container to start
+            'POSTGRES_USER': 'postgres',
             }
 PG_10 = Image('postgres', tag='10', environment=__PG_ENV)
 PG_10_ALPINE = Image('postgres', tag='10-alpine', environment=__PG_ENV)
