@@ -8,7 +8,8 @@ jobs:
   test:
     description: Run the test suite
     machine:
-      image: circleci/classic:201808-01
+      image: ubuntu-2004:202101-01
+      # image: circleci/classic:201808-01
     parameters:
       pyversion:
         type: string
@@ -174,6 +175,21 @@ workflows:
             - /v[0-9]+\.[0-9]+\.[0-9]+/
         name: "test3.7"
         pyversion: "3.7"
+    - test:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "test3.8"
+        pyversion: "3.8"
+
+    - test:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "test3.9"
+        pyversion: "3.9"
 
     # Not available yet
     # - test:
@@ -196,7 +212,8 @@ workflows:
         requires:
         - test3.6
         - test3.7
-        # - test3.8
+        - test3.8
+        - test3.9
         pyversion: "3.7"
 
     - validate_package:
@@ -219,6 +236,26 @@ workflows:
         requires:
         - "Build package"
 
+    - validate_package:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Validate Package with Python 3.8"
+        pyversion: "3.8"
+        requires:
+        - "Build package"
+
+    - validate_package:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Validate Package with Python 3.9"
+        pyversion: "3.9"
+        requires:
+        - "Build package"
+
     - publish_package:
         name: "Publish package"
         filters:
@@ -234,7 +271,7 @@ workflows:
         requires:
         - "Validate Package with Python 3.6"
         - "Validate Package with Python 3.7"
-        # - "Validate Package with Python 3.8"
-
+        - "Validate Package with Python 3.8"
+        - "Validate Package with Python 3.9"
 
 # vim: et:sw=2:syntax=yaml:ts=2:
