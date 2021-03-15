@@ -25,7 +25,8 @@ class Image:
                  hash_: str = None,
                  max_wait: float = 5.0,
                  tag: str = DEFAULT_IMAGE_TAG,
-                 environment: Mapping[str, Optional[str]] = None) -> None:
+                 environment: Mapping[str, Optional[str]] = None,
+                 ) -> None:
         self.__environment = environment or dict()
         self.__hash = hash_
         self.__max_wait = max_wait
@@ -62,8 +63,8 @@ class Image:
         """The tag of the Image"""
         return self.__tag
 
+    # Should be Union[str, placeholders.ContainerIDType]]:
     def check_command(self) -> List[
-            # Should be Union[str, placeholders.ContainerIDType]]:
             Union[str, placeholders._Placeholder]]:  # pylint: disable=no-self-use
         """A command to run to ensure a container build from this image is up and ready
 

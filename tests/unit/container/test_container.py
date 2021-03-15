@@ -25,8 +25,7 @@ def test_container_environment_inherits_image_environment(dummy_env, client, run
     cntr.run(dockerclient=client)
 
     # Then
-    client.containers.run.assert_called_once_with(entrypoint=None,
-                                                  environment=dummy_env,
+    client.containers.run.assert_called_once_with(environment=dummy_env,
                                                   image=client.images.pull(image.pullname),
                                                   **cntr.options)
 

@@ -1,17 +1,24 @@
 # -*- coding: utf-8; -*-
+"""Container classes and factory functions
+
+
+"""
 import logging
-import socket
+from socket import AF_INET, AF_INET6, SOCK_DGRAM, SOCK_STREAM, socket
 import subprocess
-import time
-from typing import Any, cast, Dict, Generator, List, Mapping, Optional, Tuple, Union
+from time import sleep, time
+from typing import Any, Callable, cast, Dict, Generator, List, Mapping, Optional, Tuple, Union
 import warnings
 
 import docker
 from docker.models import images
 import requests.exceptions
 
+from . import ci
 from .image import Image
 
+
+__all__ = ('ci_fixture', 'Container', 'fixture')
 
 _CONTAINER_DEFAULT_OPTIONS = dict(cap_add=['IPC_LOCK'],
                                   # mem_limit='256m',
@@ -77,7 +84,7 @@ def _port(port: str) -> Tuple[int, str]:
 
 
 def _prune_dict(dictionary: Mapping[Any, Optional[Any]]) -> Mapping[Any, Any]:
-    """Removes None values from possibly nested dict.
+    """Removes None values from pCallable, ossibly nested dict.
 
     Note: this function does not prune structures others than dict,
       for example print_dict({'k': [None, None]}) will not remove the
@@ -97,18 +104,91 @@ def _prune_dict(dictionary: Mapping[Any, Optional[Any]]) -> Mapping[Any, Any]:
     return res
 
 
-class Container:
+# class Service(Protocol):
+#
+#     @property
+#     def address(self) -> str:
+#         """The IP address of the created container.
+#         """
+#         ...
+#
+#     @property
+#     def ports(self) -> Dict[str, Tuple[int, str]]:
+#         """The ports the created container listens on.
+#
+#         """
+#         ...
+
+
+class Service:
+    @property
+    def address(self) -> str:
+        """The IP address of the created container.
+        """
+        raise NotImplementedError()
+
+    @property
+    def ports(self) -> Dict[str, Tuple[int, str]]:
+        """The ports the created container listens on.
+
+        """
+        raise NotImplementedError()
+
+
+class WaiterMixin(Service):  # Inheritance not required with protocols
+    """Mixin providing means to wait for a network port to be listening.
+
+    The class this mixin blends with are expected to follow the Service
+    protocol.
+    """
+
+    def wait(self: Service,
+             *ports: Tuple[int, str],
+             max_wait: float = 0.0,
+             readyness_poll_interval: float = 0.1,
+             ) -> bool:
+        """Waits for the container to be listening on some network ports.
+        """
+        if not ports:
+            next_round_ports = list(self.ports.values())
+        else:
+            next_round_ports = list(ports)
+
+        then = time()
+        while (time() - then) < max_wait:
+            ports_to_check = next_round_ports
+            next_round_ports = []
+
+            for port, proto in ports_to_check:
+                try:
+                    sock_proto = SOCK_STREAM if proto[:3] == 'tcp' else SOCK_DGRAM
+                    with socket(AF_INET6 if proto[-1] == '6' else AF_INET, sock_proto) as sock:
+                        sock.connect((self.address, port))
+                except ConnectionError:
+                    next_round_ports.append((port, proto))
+                    sleep(readyness_poll_interval)
+
+            if not next_round_ports:
+                return True
+        raise TimeOut('Container taking too long to become ready (waited {:.2f}s.): {} {}'
+                      .format(time() - then,
+                              self.address,
+                              ', '.join(['{}/{}'.format(str(x[0]), x[1])
+                                         for x in next_round_ports])))
+
+
+class Container(WaiterMixin):  # , Service  # When 3.6 & 3.7 are dropped and we can use protocols
     """Represents a container
     """
     __slots__ = ('__client',
                  '__command',
                  '__container',
                  '__environment',
-                 '__image',
                  '__max_wait',
                  '__options',
                  '__readyness_poll_interval',
                  '__startup_poll_interval',
+                 '_image',
                  )
 
     def __enter__(self):
@@ -123,6 +203,8 @@ class Container:
 
     @staticmethod
     def __has_entrypoint(image):
+        """Checks whether the docker image has an entrypoint defined
+        """
         return ('Config' in image.attrs
                 and 'Entrypoint' in image.attrs['Config']
                 and image.attrs['Config']['Entrypoint'])
@@ -133,8 +215,8 @@ class Container:
                  command: Optional[Union[str, List[str]]] = None,
                  dockerclient: docker.client.DockerClient = None,
                  environment: Mapping[str, str] = None,
-                 max_wait: float = 10.0,
-                 options=None,
+                 max_wait: Optional[float] = None,
+                 options: Optional[Mapping[str, Any]] = None,
                  startup_poll_interval: float = 1,
                  readyness_poll_interval: float = 0.2,
                  ):
@@ -142,13 +224,13 @@ class Container:
 
         TODO: Build container from an ID ? (restart paused container)
         """
-        assert max_wait > 0.0
+        assert max_wait is None or max_wait > 0.0
         self.__client = dockerclient
         self.__command = command
         self.__container = None
         self.__environment = _prune_dict({** image.default_environment, **(environment or dict())})
-        self.__image = image
-        self.__max_wait = max_wait
+        self._image = image
+        self.__max_wait = max_wait or image.max_wait
         self.__options = options or dict()
         self.__readyness_poll_interval = readyness_poll_interval
         self.__startup_poll_interval = startup_poll_interval
@@ -161,7 +243,7 @@ class Container:
         started properly and is running.
 
         """
-        command = self.__image.check_command(self)
+        command = self._image.check_command(self)
         subprocess.check_call(command, shell=False)
 
     @property
@@ -194,7 +276,7 @@ class Container:
     def image(self):
         """Returns the Image the container is based upon.
         """
-        return self.__image
+        return self._image
 
     def kill(self):
         """Kills the container if still running.
@@ -244,7 +326,7 @@ class Container:
             image = self.__container.image  # type: images.Image
         else:
             imagemeta: images.RegistryData = self.__client.images.get_registry_data(
-                name=self.__image.pullname)
+                name=self._image.pullname)
             assert imagemeta.attrs['Descriptor']['mediaType'] in SUPPORTED_MANIFEST_TYPES
             image = cast(images.Image, imagemeta.pull())
         # Get list of exposed ports
@@ -283,12 +365,12 @@ class Container:
             raise ValueError('You did not provide a docker client !')
 
         try:
-            image = self.__client.images.pull(self.__image.pullname)
+            image = self.__client.images.pull(self._image.pullname)
         except docker.errors.ImageNotFound as exc:
-            raise ImageNotFound("Image '{}' does not exist".format(self.__image.pullname)) from exc
+            raise ImageNotFound("Image '{}' does not exist".format(self._image.pullname)) from exc
 
-        logging.getLogger(__name__).debug('Starting container from image: %s', self.__image.name,
-                                          extra={'pullname': self.__image.pullname,
+        logging.getLogger(__name__).debug('Starting container from image: %s', self._image.name,
+                                          extra={'pullname': self._image.pullname,
                                                  'environment': self.__environment,
                                                  'options': self.options,
                                                  })
@@ -296,15 +378,16 @@ class Container:
                     'environment': self.__environment,
                     **self.options,
                     }
-        if self.__has_entrypoint(image):
-            run_args['entrypoint'] = command or self.__command
-        else:
-            run_args['command'] = command or self.__command
+        if command or self.__command:
+            override = 'command'
+            if self.__has_entrypoint(image):
+                override = 'entrypoint'
+            run_args[override] = command or self.__command
 
         self.__container = self.__client.containers.run(**run_args)
 
-        then = time.time()
-        while (time.time() - then) < self.__max_wait:
+        then = time()
+        while (time() - then) < self.__max_wait:
             self.__container.reload()
             logging.getLogger(__name__).debug('Container %s status is %s',
                                               self.__container.id,
@@ -316,7 +399,7 @@ class Container:
             elif self.__container.status not in _CONTAINER_STATUSES_WAIT:
                 warnings.warn('Unknown container status!', RuntimeWarning)
 
-            time.sleep(self.__startup_poll_interval)  # pylint: disable=expression-not-assigned
+            sleep(self.__startup_poll_interval)  # pylint: disable=expression-not-assigned
         else:
             raise TimeOut('Container {} is taking too long to start'
                           .format(self.__container.id))
@@ -325,38 +408,101 @@ class Container:
 
     def wait(self,
              *ports: Tuple[int, str],
-             max_wait: float = None,
+             max_wait: Optional[float] = None,
              readyness_poll_interval: float = 0.1,
              ) -> bool:
-        """Waits for the container to be listening on some network ports.
-        """
         if not ports:
-            next_round_ports = list(self.ports.values())
-        else:
-            next_round_ports = list(ports)
-        max_wait = max_wait or self.__image.max_wait
+            ports = tuple(v for v in self.ports.values())
+        if max_wait is None:
+            max_wait = self.__max_wait or self._image.max_wait
+        return super().wait(*ports,
+                            max_wait=max_wait,
+                            readyness_poll_interval=readyness_poll_interval,
+                            )
 
-        then = time.time()
-        while (time.time() - then) < max_wait:
-            ports_to_check = next_round_ports
-            next_round_ports = []
 
-            for port, proto in ports_to_check:
-                try:
-                    sock_proto = socket.SOCK_STREAM if proto == 'tcp' else socket.SOCK_DGRAM
-                    with socket.socket(socket.AF_INET, sock_proto) as sock:
-                        sock.connect((self.address, port))
-                except ConnectionError:
-                    next_round_ports.append((port, proto))
-                    time.sleep(readyness_poll_interval)
+class FakeContainer(WaiterMixin):
+    """A container that actually doesn't start a container
 
-            if not next_round_ports:
-                return True
-        raise TimeOut('Container taking too long to become ready (waited {:.2f}s.): {} {}'
-                      .format(time.time() - then,
-                              self.address,
-                              ', '.join(['{}/{}'.format(str(x[0]), x[1])
-                                         for x in next_round_ports])))
+    This is intended for use in a context where Containers may be
+    defined and started by means outside of your Python test suite.
+
+    For example, more and more CI/CD are based on containers and
+    starts them for you.
+
+    This class is here to provide you with a drop-in replacement
+    for the real :class:`.Container` class you don't need in such
+    an environment, and present the same API, so you don't need to
+    worry about who actually started the containers.
+
+    """
+
+    __slots__ = ('__address', '__ports')
+
+    def __init__(self, address, *ports, max_wait=0.2, readyness_poll_interval=10.0):
+        self.__address = address
+        self.__ports = ports
+        wait_kwargs = dict(max_wait=max_wait, readyness_poll_interval=readyness_poll_interval)
+        _prune_dict(wait_kwargs)
+        self.wait(*ports, **wait_kwargs)
+
+    @property
+    def address(self) -> str:
+        """The IP address of the created container.
+        """
+        return self.__address
+
+    @property
+    def ports(self) -> Dict[str, Tuple[int, str]]:
+        """The ports the created container listens on.
+
+        """
+        return {f'{port}/{proto}': (port, proto) for port, proto in self.__ports}
+
+
+def ci_fixture(dockerclient: docker.client.DockerClient,
+               image: Image,
+               *ports: Tuple[int, str],
+               ci_check: Callable[[], bool] = ci.is_containerized_ci,
+               ci_address: str = 'localhost',
+               command: Optional[Union[str, List[str]]] = None,
+               environment: Optional[Mapping[str, str]] = None,
+               max_wait: Optional[float] = None,
+               options: Optional[Mapping[str, Any]] = None,
+               readyness_poll_interval: Optional[float] = None,
+               ) -> Generator[Service, None, None]:
+    """CI/CD compatible version of the :func:`fixture` function.
+
+    Use this fixture if your tests will run in a CI environment capable of
+    providing containers without the need to do so within the tests themselves.
+
+    Detection of whether the tests are run within a CI system is done
+    by checking if the environment variable given by the `ci_variable`
+    argument is set or not (whatever its value is).
+
+    Arguments are the same as the :func:`.fixture` function, but for two additional
+    one:
+
+    Args:
+        ci_variable: the name of the variable to check to determine if the tests
+            are running in a CI environment or not (default: `'CI'`).
+        ci_address: the network address on which the CI systems binds container
+            ports (default: `'localhost'`).
+
+    """
+    assert ci_check is not None
+
+    if ci_check():  # Assumes code is running in CI environment.
+        yield FakeContainer(ci_address, *ports)
+    else:
+        yield from fixture(dockerclient,
+                           image,
+                           *ports,
+                           command=command,
+                           environment=environment,
+                           max_wait=max_wait,
+                           options=options,
+                           readyness_poll_interval=readyness_poll_interval)
 
 
 def fixture(dockerclient: docker.client.DockerClient,
@@ -367,7 +513,12 @@ def fixture(dockerclient: docker.client.DockerClient,
             max_wait: Optional[float] = None,
             options: Optional[Mapping[str, Any]] = None,
             readyness_poll_interval: Optional[float] = None,
-            ) -> Generator[None, None, None]:
+            ) -> Generator[Service, None, None]:
+    """Creates a container and waits for it to start before returning it.
+
+    Args:
+        image: the image to use to create the container
+    """
     with Container(image,
                    command=command,
                    dockerclient=dockerclient,

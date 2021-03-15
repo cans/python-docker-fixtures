@@ -13,7 +13,7 @@ def test_container_paused_then_running(mocker, client, container_paused_after_1s
     poll_interval = 10.0
     image = Image('')
     cntr = Container(image, max_wait=2, startup_poll_interval=poll_interval)
-    sleep = mocker.patch('dockerfixtures.container.time.sleep')
+    sleep = mocker.patch('dockerfixtures.container.sleep')
 
     # When
     result = cntr.run(dockerclient=client)
@@ -64,7 +64,7 @@ def test_container_running_after_second_reload(mocker, client, container_running
     poll_interval = 10.0
     image = Image('')
     cntr = Container(image, startup_poll_interval=poll_interval)
-    sleep = mocker.patch('dockerfixtures.container.time.sleep')
+    sleep = mocker.patch('dockerfixtures.container.sleep')
 
     # When
     result = cntr.run(dockerclient=client)
@@ -109,7 +109,7 @@ def test_container_run_times_out(mocker, client, container):
                      dockerclient=client,
                      max_wait=0.000000001,
                      startup_poll_interval=0.0)
-    mocker.patch('dockerfixtures.container.time.sleep')  # bypass time.sleep()
+    mocker.patch('dockerfixtures.container.sleep')  # bypass time.sleep()
 
     # Ensure
     with pytest.raises(TimeOut):
@@ -121,6 +121,7 @@ def test_container_run_times_out(mocker, client, container):
 
 
 def test_container_run_when_image_as_command(client, container_w_command):
+    # TODO: review this test, name does not fit content
     # Given
     image = Image('')
     img = client.images.pull()
@@ -131,7 +132,7 @@ def test_container_run_when_image_as_command(client, container_w_command):
 
     # Then
     client.containers.run.assert_called_once_with(image=img,
-                                                  command=None,
+                                                  # command=None,
                                                   environment={},
                                                   **cntr.options)
 

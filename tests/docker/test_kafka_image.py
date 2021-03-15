@@ -4,11 +4,14 @@ import logging
 
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.admin import KafkaAdminClient, NewTopic
+import pytest
 
 from dockerfixtures import catalog
+from dockerfixtures.ci import is_containerized_ci
 from dockerfixtures.container import Container
 
 
+@pytest.mark.skipif(is_containerized_ci(), reason='In a containerized CI environment')
 def test_container_from_kafka_image_all_defaults(client):
     topic = 'topic'
     message_count = 20
