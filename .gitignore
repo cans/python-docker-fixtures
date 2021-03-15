@@ -4,9 +4,11 @@
 __pycache__
 .*.sw?
 .coverage
+.dir-locals.el
 .eggs
 .mypy_cache
 .pytest_cache
 build
 coverage
 dist
+package-cache/
