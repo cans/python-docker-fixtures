@@ -1,5 +1,4 @@
 # -*- coding: utf-8; -*-
-import functools
 import json
 import logging
 
@@ -41,7 +40,7 @@ def test_container_from_kafka_image_all_defaults(client):
                                  bootstrap_servers=broker,
                                  consumer_timeout_ms=5000,
                                  # request_timeout_ms=5000, # 5 seconds max.
-                                 value_deserializer=functools.partial(json.loads, encoding='utf-8'))
+                                 value_deserializer=json.loads)
         consumer.subscribe([topic])
         for idx, message in enumerate(consumer):
             logging.getLogger().info(message)
