@@ -22,7 +22,6 @@ def ci_environment(request, monkeypatch):
                           1: CONTAINERIZED_CI_VENDOR_VARS,
                           2: ['VIRTUAL_MACHINE'],
                           }
-    # import ipdb; ipdb.set_trace()
     variables, expected = request.param
     for idx, var in enumerate(variables):
         if var is not None:

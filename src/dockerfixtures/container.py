@@ -5,7 +5,6 @@
 """
 import logging
 from socket import AF_INET, AF_INET6, SOCK_DGRAM, SOCK_STREAM, socket
-import subprocess
 from time import sleep, time
 from typing import Any, Callable, cast, Dict, Generator, List, Mapping, Optional, Tuple, Union
 import warnings
@@ -121,9 +120,19 @@ def _prune_dict(dictionary: Mapping[Any, Optional[Any]]) -> Mapping[Any, Any]:
 
 
 class Service:
+
+    DEFAULT_MAX_WAIT = 1.0
+    DEFAULT_READYNESS_POLL_INTERVAL = 10.0
+
     @property
     def address(self) -> str:
         """The IP address of the created container.
+        """
+        raise NotImplementedError()
+
+    @property
+    def max_wait(self) -> float:
+        """The maximun amount of time to wait the container to be ready.
         """
         raise NotImplementedError()
 
@@ -134,6 +143,12 @@ class Service:
         """
         raise NotImplementedError()
 
+    @property
+    def readyness_poll_interval(self) -> float:
+        """The time interval at which check the container is ready.
+        """
+        raise NotImplementedError()
+
 
 class WaiterMixin(Service):  # Inheritance not required with protocols
     """Mixin providing means to wait for a network port to be listening.
@@ -141,6 +156,9 @@ class WaiterMixin(Service):  # Inheritance not required with protocols
     The class this mixin blends with are expected to follow the Service
     protocol.
     """
+
+    DEFAULT_MAX_WAIT = 1.0
+    DEFAULT_READYNESS_POLL_INTERVAL = 10.0
 
     def wait(self: Service,
              *ports: Tuple[int, str],
@@ -153,6 +171,10 @@ class WaiterMixin(Service):  # Inheritance not required with protocols
             next_round_ports = list(self.ports.values())
         else:
             next_round_ports = list(ports)
+        max_wait = max_wait or self.max_wait or self.DEFAULT_MAX_WAIT
+        readyness_poll_interval = (readyness_poll_interval or
+                                   self.readyness_poll_interval
+                                   or self.DEFAULT_READYNESS_POLL_INTERVAL)
 
         then = time()
         while (time() - then) < max_wait:
@@ -235,17 +257,6 @@ class Container(WaiterMixin):  # , Service  # When 3.6 & 3.7 are dropped and we 
         self.__readyness_poll_interval = readyness_poll_interval
         self.__startup_poll_interval = startup_poll_interval
 
-    def check(self):
-        """Runs the check command provided by the image.
-
-        If the command fails, the container is assumed to have
-        crashed.  If it succeeds the container is assumed to have
-        started properly and is running.
-
-        """
-        command = self._image.check_command(self)
-        subprocess.check_call(command, shell=False)
-
     @property
     def address(self) -> str:
         """Returns the container's IP address
@@ -310,6 +321,10 @@ class Container(WaiterMixin):  # , Service  # When 3.6 & 3.7 are dropped and we 
         return options
 
     @property
+    def max_wait(self) -> float:
+        return self.__max_wait or self._image.max_wait
+
+    @property
     def ports(self) -> Dict[str, Tuple[int, str]]:
         """Try to return the set of ports the container listens on.
 
@@ -334,6 +349,10 @@ class Container(WaiterMixin):  # , Service  # When 3.6 & 3.7 are dropped and we 
         # Update with the possible port mapping(s)
         ports.update({k: _port(k) for k, v in self.__options.get('ports', {}).items()})
         return ports
+
+    @property
+    def readyness_poll_interval(self) -> float:
+        return self.__readyness_poll_interval
 
     def remove(self) -> None:
         """Removes the container
@@ -406,20 +425,6 @@ class Container(WaiterMixin):  # , Service  # When 3.6 & 3.7 are dropped and we 
 
         return self.__container.id
 
-    def wait(self,
-             *ports: Tuple[int, str],
-             max_wait: Optional[float] = None,
-             readyness_poll_interval: float = 0.1,
-             ) -> bool:
-        if not ports:
-            ports = tuple(v for v in self.ports.values())
-        if max_wait is None:
-            max_wait = self.__max_wait or self._image.max_wait
-        return super().wait(*ports,
-                            max_wait=max_wait,
-                            readyness_poll_interval=readyness_poll_interval,
-                            )
-
 
 class FakeContainer(WaiterMixin):
     """A container that actually doesn't start a container
@@ -439,12 +444,18 @@ class FakeContainer(WaiterMixin):
 
     __slots__ = ('__address', '__ports')
 
-    def __init__(self, address, *ports, max_wait=0.2, readyness_poll_interval=10.0):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if exc_value:
+            raise exc_value
+
+    def __init__(self, address, *ports, max_wait=None, readyness_poll_interval=None):
         self.__address = address
+        self.__max_wait = max_wait
         self.__ports = ports
-        wait_kwargs = dict(max_wait=max_wait, readyness_poll_interval=readyness_poll_interval)
-        _prune_dict(wait_kwargs)
-        self.wait(*ports, **wait_kwargs)
+        self.__readyness_poll_interval = readyness_poll_interval
 
     @property
     def address(self) -> str:
@@ -453,11 +464,19 @@ class FakeContainer(WaiterMixin):
         return self.__address
 
     @property
+    def max_wait(self) -> float:
+        return self.__max_wait
+
+    @property
     def ports(self) -> Dict[str, Tuple[int, str]]:
         """The ports the created container listens on.
 
         """
         return {f'{port}/{proto}': (port, proto) for port, proto in self.__ports}
+
+    @property
+    def readyness_poll_interval(self) -> float:
+        return self.__readyness_poll_interval
 
 
 def ci_fixture(dockerclient: docker.client.DockerClient,
@@ -493,7 +512,11 @@ def ci_fixture(dockerclient: docker.client.DockerClient,
     assert ci_check is not None
 
     if ci_check():  # Assumes code is running in CI environment.
-        yield FakeContainer(ci_address, *ports)
+        with FakeContainer(ci_address, *ports) as cntr:
+            wait_kwargs = dict(max_wait=max_wait, readyness_poll_interval=readyness_poll_interval)
+            _prune_dict(wait_kwargs)
+            cntr.wait(*ports, **wait_kwargs)
+            yield cntr
     else:
         yield from fixture(dockerclient,
                            image,

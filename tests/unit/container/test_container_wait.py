@@ -20,7 +20,7 @@ def test_container_wait_when_service_does_not_start_fast_enough(mocker, containe
                  new_callable=mock.PropertyMock,
                  return_value='localhost')
     time_mock = mocker.patch('dockerfixtures.container.time',
-                             side_effect=[0.1, 0.2, 10.0, 10.0])
+                             side_effect=[0.1, 0.2, 10.0, 10.0, 10.0])
     mocker.patch('dockerfixtures.container.socket',
                  side_effect=builtins.ConnectionError())
 
