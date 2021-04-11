@@ -264,6 +264,10 @@ workflows:
       pypirepository:
         type: string
         default: "${PYPI_TEST_REPOSITORY}"
+      packaging_venv_cache_gen:
+        description: Generation number of the packaging venv cache
+        default: 3
+        type: integer
     jobs:
     - test_on_vm:
         filters:
@@ -305,12 +309,13 @@ workflows:
             only:
             - /v[0-9]+\.[0-9]+\.[0-9]+/
         name: "Build package"
+        packaging_venv_cache_gen: << parameters.packaging_venv_cache_gen >>
+        pyversion: "3.7"
         requires:
         - "Run the tests on a VM with Python 3.6"
         - "Run the tests on a VM with Python 3.7"
         - "Run the tests on a VM with Python 3.8"
         - "Run the tests on a VM with Python 3.9"
-        pyversion: "3.7"
 
     - validate_package_on_vm:
         filters:
@@ -401,6 +406,7 @@ workflows:
           tags:
             only:
             - /v[0-9]+\.[0-9]+\.[0-9]+/
+        packaging_venv_cache_gen: << parameters.packaging_venv_cache_gen >>
         pyversion: "3.9"
         pypiapitoken: "${PYPI_API_TOKEN}"
         pypirepository: "https://upload.pypi.org/legacy/"
