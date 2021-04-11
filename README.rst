@@ -2,24 +2,30 @@
 Docker containers as test fixtures made easy
 ============================================
 
+.. image:: https://badge.fury.io/py/dockerfixtures.svg
+    :alt: Latest version on Pypi: ?
+    :target: https://badge.fury.io/py/dockerfixtures
+.. image:: https://img.shields.io/pypi/pyversions/dockerfixtures.svg
+    :alt: Supported Python versions: ?
+    :target: https://pypi.org/project/dockerfixtures
 .. image:: https://travis-ci.com/cans/python-docker-fixtures.svg?branch=master
+    :alt: Build status (travis.com): ?
     :target: https://travis-ci.com/cans/python-docker-fixtures
 .. image:: https://circleci.com/gh/cans/python-docker-fixtures.svg?style=svg
+    :alt: Build status (circleci.com): ?
     :target: https://circleci.com/gh/cans/python-docker-fixtures
 .. image:: https://codecov.io/gh/cans/python-docker-fixtures/branch/master/graph/badge.svg
-  :target: https://codecov.io/gh/cans/python-docker-fixtures
+    :alt: Test coverage: ? %
+    :target: https://codecov.io/gh/cans/python-docker-fixtures
 
 
-This package was inspired by others, but was written from
-scratch. But after trying to make heads and tails of them
-when faced with bugs, I ended-up finding simpler to start
-over.
+This package was inspired by others, but after trying to make heads and tails
+of them when faced with bugs, I ended-up finding simpler to start over.
 
 Using dockerfixtures with pytest
 ================================
 
 To spawn a container in your tests, proceed as follow:
-
 
 .. code-block:: Python
 
