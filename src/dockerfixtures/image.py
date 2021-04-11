@@ -1,9 +1,7 @@
 # -*- coding: utf-8; -*-
 """Represents a Docker Image
 """
-from typing import Dict, List, Mapping, Optional, Union
-
-from . import placeholders
+from typing import Dict, Mapping, Optional
 
 
 DEFAULT_IMAGE_TAG = 'latest'
@@ -25,7 +23,8 @@ class Image:
                  hash_: str = None,
                  max_wait: float = 5.0,
                  tag: str = DEFAULT_IMAGE_TAG,
-                 environment: Mapping[str, Optional[str]] = None) -> None:
+                 environment: Mapping[str, Optional[str]] = None,
+                 ) -> None:
         self.__environment = environment or dict()
         self.__hash = hash_
         self.__max_wait = max_wait
@@ -61,15 +60,6 @@ class Image:
     def tag(self):
         """The tag of the Image"""
         return self.__tag
-
-    def check_command(self) -> List[
-            # Should be Union[str, placeholders.ContainerIDType]]:
-            Union[str, placeholders._Placeholder]]:  # pylint: disable=no-self-use
-        """A command to run to ensure a container build from this image is up and ready
-
-
-        """
-        return ['docker', 'exec', '-ti', placeholders.ContainerID, 'bash', '-c', 'exit 0']
 
 
 # vim: et:sw=4:syntax=python:ts=4:

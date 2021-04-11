@@ -30,4 +30,13 @@ def netcat(netcat_port):
                                  )
 
 
+@pytest.fixture()
+def ci_netcat(monkeypatch, netcat_port):
+    client = docker.from_env()
+    yield from container.ci_fixture(client,
+                                    image.Image('subfuzion/netcat'),
+                                    command=['nc', '-vl', str(netcat_port)],
+                                    )
+
+
 # vim: et:sw=4:syntax=python:ts=4:

@@ -7,22 +7,33 @@ set -eo pipefail
 pip install --progress-bar=off /tmp/workspace/dockerfixtures*.whl
 cat > validate.py <<EOF
 import logging
+import os
 import sys
 
 import docker
-from dockerfixtures import catalog, container
+from dockerfixtures import catalog, container, ci
+from dockerfixtures.image import Image
 
 
 def main():
-    logging.basicConfig()
-    client = docker.from_env()
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger()
+    client = None
+    if 'VIRTUAL_MACHINE' in os.environ:
+        client = docker.from_env()
+    cntr_gen = container.ci_fixture(client,
+                                    Image('subfuzion/netcat'),
+                                    command=['nc', '-vl', '9876'])
     try:
-        with container.Container(catalog.PG_11, dockerclient=client) as cntr:
-            cntr.wait((5432, 'tcp'), max_wait=10.0)
+        cntr = next(cntr_gen)
+        logger.info('Container address is: "%s"', cntr.address)
+        cntr.wait((9876, 'tcp'), max_wait=10.0)
     except:
         logger.exception('Container did not start')
         raise
-    print('Container started.', file=sys.stderr)
+    finally:
+        next(cntr_gen, None)
+    logger.info('Container started.')
 
 
 if __name__ == '__main__':

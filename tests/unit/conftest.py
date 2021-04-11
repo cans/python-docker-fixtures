@@ -1,9 +1,36 @@
 # -*- coding: utf-8; -*-
+import os
 from unittest import mock
 
 import pytest
 
 from dockerfixtures import container as c
+from dockerfixtures.ci import CONTAINERIZED_CI_VENDOR_VARS
+
+
+@pytest.fixture(params=(
+    pytest.param((('CI', 'CIRCLECI', None), True, ), id='within circleci container'),
+    pytest.param((('CI', 'CIRCLECI', 'VIRTUAL_MACHINE'), False, ), id='within circleci machine'),
+    pytest.param((('CI', 'GITHUB_ACTION', None), True, ), id='within github action'),
+    pytest.param(((None, 'GITHUB_ACTION', None), False, ), id='ignores other vars if CI undefined'),
+    pytest.param((('CI', None, None), False), id='within non-dockerized CI'),
+    pytest.param((('CI', None, 'VIRTUAL_MACINE'), False),
+                 id='within non-dockerized CI (VM defined)'),
+))
+def ci_environment(request, monkeypatch):
+    variables_to_unset = {0: ['CI'],
+                          1: CONTAINERIZED_CI_VENDOR_VARS,
+                          2: ['VIRTUAL_MACHINE'],
+                          }
+    variables, expected = request.param
+    for idx, var in enumerate(variables):
+        if var is not None:
+            monkeypatch.setenv(var, '<value does not matter>')
+            continue
+        # 'cause these tests may run in a CI where these variables may be defined
+        for variable in [v for v in variables_to_unset[idx] if v in os.environ]:
+            monkeypatch.delenv(variable)
+    return expected
 
 
 @pytest.fixture

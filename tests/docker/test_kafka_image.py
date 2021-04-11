@@ -1,15 +1,17 @@
 # -*- coding: utf-8; -*-
-import functools
 import json
 import logging
 
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.admin import KafkaAdminClient, NewTopic
+import pytest
 
 from dockerfixtures import catalog
+from dockerfixtures.ci import is_containerized_ci
 from dockerfixtures.container import Container
 
 
+@pytest.mark.skipif(is_containerized_ci(), reason='In a containerized CI environment')
 def test_container_from_kafka_image_all_defaults(client):
     topic = 'topic'
     message_count = 20
@@ -41,7 +43,7 @@ def test_container_from_kafka_image_all_defaults(client):
                                  bootstrap_servers=broker,
                                  consumer_timeout_ms=5000,
                                  # request_timeout_ms=5000, # 5 seconds max.
-                                 value_deserializer=functools.partial(json.loads, encoding='utf-8'))
+                                 value_deserializer=json.loads)
         consumer.subscribe([topic])
         for idx, message in enumerate(consumer):
             logging.getLogger().info(message)
