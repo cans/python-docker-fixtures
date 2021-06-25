@@ -10,7 +10,7 @@ from dockerfixtures.ci import __vendor_check_circleci
 
 @pytest.fixture
 def environ(monkeypatch):
-    buildnum = 360
+    buildnum = '360'
     if 'CIRCLE_BUILD_NUM' not in os.environ:
         monkeypatch.setenv('CIRCLE_BUILD_NUM', buildnum)
     if 'CIRCLE_BUILD_URL' not in os.environ:
