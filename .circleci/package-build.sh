@@ -9,7 +9,10 @@ then
     mkdir ./dist
     cp /tmp/workspace/dockerfixtures*.whl ./dist
 else
-    python setup.py sdist bdist_wheel
+    python -m build
+    # Alternate option to build the package should be:
+    #   pip install -q build
+    # But that seem to require an extra package (weirdly the one use above).
     cp dist/*.whl /tmp/workspace/
     python -m setuptools_scm | sed -Ene 's/^(Guessed Version +)(.*)/\2/ip' > /tmp/workspace/version
 fi
