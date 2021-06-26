@@ -9,5 +9,6 @@ PARENT_DIR="$(cd "$(dirname "${0}")" ; pwd)"
 #     echo "Virtual environment restored from cache"
 # else
 ensure_venv_exists "${1}"
-pip3 install --progress-bar=off -U -e .[dev]
+# pip3 install --progress-bar=off -U pip~=21.1.0 setuptools~=57.0.0 wheel~=0.36.2 setuptools_scm~=6.0.0
+pip3 install --progress-bar=off -U -e '.[dev]'
 # fi
