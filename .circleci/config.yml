@@ -95,13 +95,13 @@ jobs:
     steps:
     - checkout
     - restore_cache:
-        key: venv-{{ checksum "setup.cfg" }}-{{ checksum ".circleci/package-venv.sh" }}-packaging-<< parameters.pyversion >>-v<< parameters.packaging_venv_cache_gen >>
+        key: venv-{{ checksum ".circleci/package-venv.sh" }}-packaging-<< parameters.pyversion >>-v<< parameters.packaging_venv_cache_gen >>
     - run:
         name: "Configure Packaging Virtual environment"
         command: |
           ./.circleci/package-venv.sh "<< parameters.pyversion >>"
     - save_cache:
-        key: venv-{{ checksum "setup.cfg" }}-{{ checksum ".circleci/package-venv.sh" }}-packaging-<< parameters.pyversion >>-v<< parameters.packaging_venv_cache_gen >>
+        key: venv-{{ checksum ".circleci/package-venv.sh" }}-packaging-<< parameters.pyversion >>-v<< parameters.packaging_venv_cache_gen >>
         paths:
           - ~/.venv
           - ~/docker-fixtures/src/dockerfixtures.egg-info
@@ -245,7 +245,7 @@ jobs:
     steps:
     - checkout
     - restore_cache:
-        key: venv-{{ checksum "setup.cfg" }}-packaging-<< parameters.pyversion >>-v<<parameters.packaging_venv_cache_gen>>
+        key: venv-{{ checksum ".circleci/package-venv.sh" }}-packaging-<< parameters.pyversion >>-v<< parameters.packaging_venv_cache_gen >>
 
     - attach_workspace:
         at: /tmp/workspace
