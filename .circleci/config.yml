@@ -20,10 +20,14 @@ executors:
         type: string
         default: "3.7"
   vm:
-    machine:
-      image: ubuntu-2004:202101-01
     environment:
       VIRTUAL_MACHINE: True
+    parameters:
+      pyversion:
+        type: string
+        default: "3.7"
+    machine:
+      image: ubuntu-2004:202111-01
 
 orbs:
   codecov: codecov/codecov@1.1.3
@@ -116,6 +120,9 @@ jobs:
         paths:
         - version
         - '*.whl'
+    - store_artifacts:
+        path: /tmp/workspace
+        destination: packages
     working_directory: ~/docker-fixtures
 
   validate_package_on_vm:
@@ -304,6 +311,14 @@ workflows:
         name: "Run the tests on a VM with Python 3.9"
         pyversion: "3.9"
 
+    - test_on_vm:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Run the tests on a VM with Python 3.10"
+        pyversion: "3.10"
+
     - build_package:
         filters:
           # branches:
@@ -320,6 +335,7 @@ workflows:
         - "Run the tests on a VM with Python 3.7"
         - "Run the tests on a VM with Python 3.8"
         - "Run the tests on a VM with Python 3.9"
+        - "Run the tests on a VM with Python 3.10"
 
     - validate_package_on_vm:
         filters:
@@ -358,6 +374,16 @@ workflows:
             - /v[0-9]+\.[0-9]+\.[0-9]+/
         name: "Validate Package on a VM with Python 3.9"
         pyversion: "3.9"
+        requires:
+        - "Build package"
+
+    - validate_package_on_vm:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Validate Package on a VM with Python 3.10"
+        pyversion: "3.10"
         requires:
         - "Build package"
 
@@ -401,6 +427,16 @@ workflows:
         requires:
         - "Build package"
 
+    - validate_package_on_docker:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Validate Package on docker with Python 3.10"
+        pyversion: "3.10"
+        requires:
+        - "Build package"
+
     - publish_package:
         name: "Publish package"
         filters:
@@ -419,9 +455,11 @@ workflows:
         - "Validate Package on a VM with Python 3.7"
         - "Validate Package on a VM with Python 3.8"
         - "Validate Package on a VM with Python 3.9"
+        - "Validate Package on a VM with Python 3.10"
         - "Validate Package on docker with Python 3.6"
         - "Validate Package on docker with Python 3.7"
         - "Validate Package on docker with Python 3.8"
         - "Validate Package on docker with Python 3.9"
+        - "Validate Package on docker with Python 3.10"
 
 # vim: et:sw=2:syntax=yaml:ts=2:

@@ -8,10 +8,7 @@ else
     python -m venv ~/.venv
     # shellcheck source=/dev/null
     . ~/.venv/bin/activate
-    if [ "3.6" = "${1}" ]
-    then
-        pip install -U pip  # 3.6 does not support --progress-bar out of the box
-    fi
+    pip install -U pip  # 3.6 does not support --progress-bar out of the box
     pip install --progress-bar=off build "setuptools_scm[toml]~=6.0.0" twine
     # pip install --progress-bar=off -e '.[dev]'
 fi
