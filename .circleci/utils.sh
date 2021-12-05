@@ -31,14 +31,11 @@ ensure_venv_exists() {
     python3 -m venv --copies --prompt "${CIRCLE_JOB}" ~/.venv
     # shellcheck source=/dev/null
     . ~/.venv/bin/activate
-    if [ "3.6" = "${1}" ]
+    echo "Upgrading pip ..."
+    if pip install --progress-bar="off" -U pip
     then
-        echo "Upgrading pip ..."
-        if pip install --progress-bar="off" -U pip
-        then
-            echo "done"
-        else
-            echo 'failed !'
-        fi
+        echo "done"
+    else
+        echo 'failed !'
     fi
 }
