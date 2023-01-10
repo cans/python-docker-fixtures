@@ -27,7 +27,7 @@ executors:
         type: string
         default: "3.7"
     machine:
-      image: ubuntu-2004:202111-01
+      image: ubuntu-2204:2022.10.1
 
 orbs:
   codecov: codecov/codecov@1.1.3
@@ -280,13 +280,6 @@ workflows:
         default: 3
         type: integer
     jobs:
-    - test_on_vm:
-        filters:
-          tags:
-            only:
-            - /v[0-9]+\.[0-9]+\.[0-9]+/
-        name: "Run the tests on a VM with Python 3.6"
-        pyversion: "3.6"
 
     - test_on_vm:
         filters:
@@ -319,6 +312,14 @@ workflows:
         name: "Run the tests on a VM with Python 3.10"
         pyversion: "3.10"
 
+    - test_on_vm:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Run the tests on a VM with Python 3.11"
+        pyversion: "3.11"
+
     - build_package:
         filters:
           # branches:
@@ -331,21 +332,11 @@ workflows:
         packaging_venv_cache_gen: << parameters.packaging_venv_cache_gen >>
         pyversion: << parameters.packaging_pyversion >>
         requires:
-        - "Run the tests on a VM with Python 3.6"
         - "Run the tests on a VM with Python 3.7"
         - "Run the tests on a VM with Python 3.8"
         - "Run the tests on a VM with Python 3.9"
         - "Run the tests on a VM with Python 3.10"
-
-    - validate_package_on_vm:
-        filters:
-          tags:
-            only:
-            - /v[0-9]+\.[0-9]+\.[0-9]+/
-        name: "Validate Package on a VM with Python 3.6"
-        pyversion: "3.6"
-        requires:
-        - "Build package"
+        - "Run the tests on a VM with Python 3.11"
 
     - validate_package_on_vm:
         filters:
@@ -387,13 +378,13 @@ workflows:
         requires:
         - "Build package"
 
-    - validate_package_on_docker:
+    - validate_package_on_vm:
         filters:
           tags:
             only:
             - /v[0-9]+\.[0-9]+\.[0-9]+/
-        name: "Validate Package on docker with Python 3.6"
-        pyversion: "3.6"
+        name: "Validate Package on a VM with Python 3.11"
+        pyversion: "3.11"
         requires:
         - "Build package"
 
@@ -437,6 +428,16 @@ workflows:
         requires:
         - "Build package"
 
+    - validate_package_on_docker:
+        filters:
+          tags:
+            only:
+            - /v[0-9]+\.[0-9]+\.[0-9]+/
+        name: "Validate Package on docker with Python 3.11"
+        pyversion: "3.11"
+        requires:
+        - "Build package"
+
     - publish_package:
         name: "Publish package"
         filters:
@@ -451,15 +452,15 @@ workflows:
         pypiapitoken: "${PYPI_API_TOKEN}"
         pypirepository: "https://upload.pypi.org/legacy/"
         requires:
-        - "Validate Package on a VM with Python 3.6"
         - "Validate Package on a VM with Python 3.7"
         - "Validate Package on a VM with Python 3.8"
         - "Validate Package on a VM with Python 3.9"
         - "Validate Package on a VM with Python 3.10"
-        - "Validate Package on docker with Python 3.6"
+        - "Validate Package on a VM with Python 3.11"
         - "Validate Package on docker with Python 3.7"
         - "Validate Package on docker with Python 3.8"
         - "Validate Package on docker with Python 3.9"
         - "Validate Package on docker with Python 3.10"
+        - "Validate Package on docker with Python 3.11"
 
 # vim: et:sw=2:syntax=yaml:ts=2:
